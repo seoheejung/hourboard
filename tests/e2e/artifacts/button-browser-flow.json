@@ -14,7 +14,8 @@
     "current round initially has no winner": true,
     "empty message disables button": true,
     "blank message disables button": true,
-    "over 120 characters disables button": true,
+    "typing or pasting beyond 120 characters keeps only 120": true,
+    "emoji count follows server character limit": true,
     "valid message enables button before winner": true,
     "first registration shows WINNER": true,
     "winner copy says until the next hour": true,
@@ -39,14 +40,14 @@
     "next round enables button immediately at corrected boundary": true
   },
   "slotAt": "2026-09-26T16:00:00.000Z",
-  "registrationClosesAt": "2026-09-26T16:10:08.444Z",
+  "registrationClosesAt": "2026-09-26T16:16:47.676Z",
   "clockCheck": "Actual ten-second window awaited; hour transition simulated in browser and prior-round DB fixture",
   "mobile": {
     "text": "한 시간 동안 띄워드립니다",
     "lineHeight": 25.056,
     "height": 25.046875,
     "horizontalOverflow": false,
-    "buttonBottom": 668.359375
+    "buttonBottom": 642.359375
   },
   "previousRoundFixture": {
     "requested": 1,

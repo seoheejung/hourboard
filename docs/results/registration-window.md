@@ -9,6 +9,7 @@
 - `GET /api/round`는 `registrationOpen`, `registrationClosesAt`을 반환한다. 성공 등록 응답도 `registrationClosesAt`을 반환해 해당 브라우저가 10초 경계에서 버튼을 끈다.
 - 마감 뒤에도 Winner 문구는 Round 종료까지 조회·표시한다. 새 Round는 이전 Winner의 마감 상태를 이어받지 않는다.
 - 등록 마감 뒤 다음 정각 5분 전까지 버튼을 숨긴다. 5분 전부터는 비활성 상태로 표시하고, 보정된 서버 시각의 정각에 새 Round로 즉시 전환해 유효한 문구의 버튼을 활성화한다. 서버 상태는 이어서 조회하며, 등록의 최종 판정은 API가 한다.
+- 입력창은 서버와 같은 Unicode 문자 수 기준으로 120자를 넘는 입력을 잘라낸다. 한글 조합 중에는 입력을 유지하고 조합 완료 시 제한을 적용한다.
 - 기존 `created_at` 열을 활용하므로 DB migration은 추가하지 않았다.
 
 ## 검증 결과
@@ -22,6 +23,8 @@
 Phase 1 E2E는 병렬 등록 100건 모두 성공, Winner 1건, 순위 1~100, 중복·누락 순위 0건, Winner 문구 변형 0건을 기록했다. 별도 fixture에서 등록 요청을 PostgreSQL row lock 뒤에 대기시킨 후 Window를 넘겨 잠금을 해제했으며, 해당 요청은 409로 거부되고 기존 순위·Winner 문구는 유지됐다.
 
 브라우저 E2E는 Winner 없는 현재 Round의 버튼 활성, 최초 WINNER·position 1, 10초 이내 Winner 존재 상태의 버튼 활성과 RANKED·position 2 이상을 확인했다. 실제 10초 경과를 기다린 뒤 버튼 비활성, 직접 API 요청의 `409 REGISTRATION_CLOSED`, Winner 문구 유지도 확인했다. 시각 조정으로 다음 정각 5분보다 앞선 때 버튼 숨김, 5분 이내 비활성 표시, 정각 1초 전 비활성 유지를 확인했다. 현재 Round 요청 4건 중 성공 3건·마감 거부 1건이었고, 성공 순위는 1~3이며 중복·누락 순위와 Winner 문구 변형은 0건이다.
+
+긴 한글 문구를 실제 Chrome 입력창에 삽입한 결과 120자까지만 남고 `0자 남음`으로 표시됐다. 이모지 121자 입력도 서버와 같은 Unicode 문자 수 기준으로 120자까지 제한됐다.
 
 이전 Round Winner만 남긴 실제 PostgreSQL fixture에서는 현재 Round의 `registrationOpen = true`, `registrationClosesAt = null`과 새 WINNER·position 1을 확인했다. 브라우저에서는 시각 조정으로 정각 직전까지 버튼 비활성, 정각 경계에서 서버 조회 응답을 기다리지 않는 버튼 활성과 상태 초기화를 확인했다. 실제 정각까지 대기하는 검증은 수행하지 않았다. Slot 종료 시각이 10초 Window보다 빠른 fixture에서는 `registrationClosesAt`이 Slot 종료로 제한됨을 확인했다.
 

@@ -130,7 +130,11 @@ try {
   await until(async () => evaluate("document.getElementById('round-status')?.textContent === '현재 라운드에 등록할 수 있습니다.'"));
   check('empty message disables button', await evaluate("document.getElementById('submit-button').disabled"));
   check('blank message disables button', await type('   '));
-  check('over 120 characters disables button', await type('가'.repeat(121)));
+  await evaluate("(() => { const input = document.getElementById('message-input'); input.value = ''; input.focus(); })()");
+  await send('Input.insertText', { text: '가'.repeat(166) });
+  check('typing or pasting beyond 120 characters keeps only 120', await evaluate("document.getElementById('message-input').value === '가'.repeat(120) && document.getElementById('remaining').textContent === '0자 남음'"));
+  await type('😀'.repeat(121));
+  check('emoji count follows server character limit', await evaluate("Array.from(document.getElementById('message-input').value).length === 120 && document.getElementById('remaining').textContent === '0자 남음'"));
   check('valid message enables button before winner', !(await type('browser-first')));
   await evaluate("document.getElementById('submit-button').click()");
   await until(async () => evaluate("document.getElementById('result').dataset.state === 'winner'"));

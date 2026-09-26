@@ -31,6 +31,7 @@ const submitButton = element<HTMLButtonElement>('submit-button');
 const result = element<HTMLElement>('result');
 const HOUR_MS = 3_600_000;
 const BUTTON_PREVIEW_MS = 5 * 60_000;
+const MAX_MESSAGE_LENGTH = 120;
 
 let serverOffsetMs = 0;
 let round: RoundResponse | null = null;
@@ -47,7 +48,7 @@ let displayedBoardMessage = '';
 function serverNow() { return Date.now() + serverOffsetMs; }
 function validMessage() {
   const value = input.value;
-  return value.trim().length > 0 && Array.from(value).length <= 120 && !/[\r\n\u2028\u2029]/u.test(value);
+  return value.trim().length > 0 && Array.from(value).length <= MAX_MESSAGE_LENGTH && !/[\r\n\u2028\u2029]/u.test(value);
 }
 function canSubmit() {
   if (!targetSlotAt || round?.currentSlot.registrationOpen === false || pending || !validMessage()) return false;
@@ -202,12 +203,18 @@ function tick() {
   }
 }
 
-input.addEventListener('input', () => {
-  const left = 120 - Array.from(input.value).length;
-  remaining.textContent = left >= 0 ? `${left}자 남음` : `${-left}자 초과`;
-  input.setAttribute('aria-invalid', String(left < 0));
+function updateInputCount() {
+  const characters = Array.from(input.value);
+  if (characters.length > MAX_MESSAGE_LENGTH) input.value = characters.slice(0, MAX_MESSAGE_LENGTH).join('');
+  remaining.textContent = `${MAX_MESSAGE_LENGTH - Array.from(input.value).length}자 남음`;
+  input.setAttribute('aria-invalid', 'false');
   tick();
+}
+
+input.addEventListener('input', event => {
+  if (!(event instanceof InputEvent && event.isComposing)) updateInputCount();
 });
+input.addEventListener('compositionend', updateInputCount);
 
 form.addEventListener('submit', async event => {
   event.preventDefault();
