@@ -30,7 +30,7 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 
 **1등**
 
-> 축하합니다!  
+> 축하합니다!  ~`
 > 가장 먼저 등록하셨습니다.  
 > 작성하신 문구를 한 시간 동안 띄워드립니다.
 
@@ -250,7 +250,11 @@ winner message mutation = 0
 
 ### `POST /api/attempts`
 
-요청:
+현재 Round 등록.
+
+클라이언트는 도전하려는 Round의 `slotAt`과 문구를 전달한다. 서버는 시스템 시간을 기준으로 `slotAt`이 현재 등록 가능한 Round인지 검증한다.
+
+#### 요청
 
 ```json
 {
@@ -259,35 +263,55 @@ winner message mutation = 0
 }
 ```
 
-성공 응답:
+#### Winner 응답
 
 ```json
 {
-  "slotAt": "2026-09-26T10:00:00.000Z",
-  "position": 37,
-  "winner": false
-}
-```
-
-1등 응답:
-
-```json
-{
-  "slotAt": "2026-09-26T10:00:00.000Z",
+  "slotAt": "2026-09-26T11:00:00.000Z",
+  "code": "WINNER",
+  "message": "가장 먼저 등록하셨습니다. 작성하신 문구를 한 시간 동안 띄워드립니다.",
   "position": 1,
   "winner": true
 }
 ```
 
+#### 2등 이후 응답
+
+```json
+{
+  "slotAt": "2026-09-26T11:00:00.000Z",
+  "code": "RANKED",
+  "message": "37번째로 등록하셨습니다.",
+  "position": 37,
+  "winner": false
+}
+```
+
+등록 성공 응답은 slotAt, code, message, position, winner 구조를 공통으로 사용한다.
+
+Winner가 아닌 응답에는 다른 사용자의 winner_message를 포함하지 않는다. 현재 전광판 상태와 Winner 문구는 GET /api/round에서 조회한다.
+
 ### 오류 코드
 
 | HTTP | Code | 의미 |
 | --- | --- | --- |
-| 400 | `INVALID_REQUEST` | 입력 형식 오류 |
-| 409 | `ROUND_EXPIRED` | 목표 슬롯 종료 |
-| 425 | `TOO_EARLY` | 목표 슬롯 시작 전 |
-| 500 | `INTERNAL_ERROR` | 처리 실패 |
+| 400 | `INVALID_REQUEST` | 요청 본문 또는 입력 형식 오류 |
+| 400 | `INVALID_SLOT` | `slotAt` 형식 오류 또는 정각이 아닌 Slot |
+| 409 | `ROUND_ENDED` | 목표 Round 종료 |
+| 425 | `ROUND_NOT_STARTED` | 목표 Round 시작 전 |
+| 500 | `INTERNAL_ERROR` | 서버 내부 처리 실패 |
 | 503 | `DATABASE_UNAVAILABLE` | PostgreSQL 연결 불가 |
+
+오류 응답은 `code`, `message`, `position`, `winner` 구조를 공통으로 사용한다.
+
+```json
+{
+  "code": "ROUND_NOT_STARTED",
+  "message": "아직 시작하지 않은 Round입니다.",
+  "position": null,
+  "winner": false
+}
+```
 
 ---
 
