@@ -42,6 +42,7 @@ input[aria-invalid="true"] { border-color: #ffac81; }
 .input-meta p { margin: 0; }
 #remaining { flex: none; }
 button { width: 100%; min-height: 50px; border: 0; border-radius: 9px; background: #45b978; color: #0d2017; font: inherit; font-size: 1.02rem; font-weight: 760; cursor: pointer; }
+button[hidden] { display: none; }
 button:hover:not(:disabled) { background: #6bd493; }
 button:disabled { background: #52625c; color: #d8e0dc; cursor: not-allowed; }
 :focus-visible { outline: 3px solid #ba6a22; outline-offset: 3px; }

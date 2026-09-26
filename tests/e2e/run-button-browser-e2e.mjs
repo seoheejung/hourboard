@@ -176,7 +176,9 @@ try {
     const originalTarget = targetSlotAt;
     const originalOffset = serverOffsetMs;
     const originalClose = registrationClosesAt;
+    const originalBoundary = observedBoundary;
     const button = document.getElementById('submit-button');
+    observedBoundary = round.nextSlotAt;
     registrationClosesAt = null;
     targetSlotAt = new Date(serverNow() + 60_000).toISOString();
     tick();
@@ -190,14 +192,38 @@ try {
     targetSlotAt = originalTarget;
     serverOffsetMs = originalOffset;
     registrationClosesAt = originalClose;
+    observedBoundary = originalBoundary;
     tick();
     return { beforeStartDisabled, atStartEnabled, afterEndDisabled };
   })()`);
   check('slot clock gates registration in browser', timing.beforeStartDisabled && timing.atStartEnabled && timing.afterEndDisabled);
   artifact.clockCheck = 'Browser clock offset simulated; actual hour boundary was not awaited';
 
-  await until(async () => evaluate("document.getElementById('submit-button').disabled && document.getElementById('round-status').textContent === '이번 라운드의 등록이 마감되었습니다.'"), 160);
+  const activeButtonBottom = await evaluate("document.getElementById('submit-button').getBoundingClientRect().bottom");
+  await until(async () => evaluate("document.getElementById('submit-button').disabled && /등록이 마감|다음 정각에 등록 버튼/.test(document.getElementById('round-status').textContent)"), 160);
   check('button disables after real ten-second window', await evaluate('serverNow() >= Date.parse(registrationClosesAt)'));
+  const preview = await evaluate(`(() => {
+    const oldOffset = serverOffsetMs;
+    const oldOpen = round.currentSlot.registrationOpen;
+    const start = Date.parse(round.nextSlotAt);
+    const button = document.getElementById('submit-button');
+    round.currentSlot.registrationOpen = false;
+    serverOffsetMs = start - 300_100 - Date.now();
+    tick();
+    const hiddenBeforeFiveMinutes = button.hidden && button.disabled;
+    serverOffsetMs = start - 299_900 - Date.now();
+    tick();
+    const visibleAtFiveMinutes = !button.hidden && button.disabled;
+    serverOffsetMs = start - 1_000 - Date.now();
+    tick();
+    const disabledOneSecondBefore = !button.hidden && button.disabled;
+    serverOffsetMs = oldOffset;
+    round.currentSlot.registrationOpen = oldOpen;
+    tick();
+    return { hiddenBeforeFiveMinutes, visibleAtFiveMinutes, disabledOneSecondBefore };
+  })()`);
+  check('button hides until five minutes before next hour', preview.hiddenBeforeFiveMinutes && preview.visibleAtFiveMinutes);
+  check('button remains disabled one second before next hour', preview.disabledOneSecondBefore);
   const lateResponse = await fetch(`${base}/api/attempts`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ slotAt, message: 'browser-late' })
@@ -215,7 +241,7 @@ try {
     return { text: title.textContent, lineHeight: parseFloat(getComputedStyle(title).lineHeight),
       height: title.getBoundingClientRect().height,
       horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
-      buttonBottom: document.getElementById('submit-button').getBoundingClientRect().bottom };
+      buttonBottom: ${activeButtonBottom} };
   })()`);
   check('mobile title is one line with new spacing', layout.text === '한 시간 동안 띄워드립니다' && layout.height < layout.lineHeight * 1.5);
   check('mobile has no horizontal overflow', !layout.horizontalOverflow);
@@ -247,17 +273,15 @@ try {
   artifact.previousRoundFixture = { requested: 1, succeeded: 1, winnerCount: 1, position: 1 };
   const nextRoundUi = await evaluate(`(() => {
     const start = Date.parse(round.nextSlotAt);
-    serverOffsetMs = start - Date.now();
-    applyRound({
-      serverTime: new Date(start).toISOString(),
-      currentSlot: { startsAt: new Date(start).toISOString(), endsAt: new Date(start + 3_600_000).toISOString(),
-        message: null, attemptCount: null, registrationOpen: true, registrationClosesAt: null },
-      nextSlotAt: new Date(start + 3_600_000).toISOString()
-    });
+    const originalFetch = window.fetch;
+    window.fetch = (...args) => args[0] === '/api/round' ? new Promise(() => {}) : originalFetch(...args);
+    serverOffsetMs = start + 100 - Date.now();
+    tick();
     return { enabled: !document.getElementById('submit-button').disabled,
+      visible: !document.getElementById('submit-button').hidden,
       closeCleared: registrationClosesAt === null, newTarget: targetSlotAt === new Date(start).toISOString() };
   })()`);
-  check('next round clears close state in browser', nextRoundUi.enabled && nextRoundUi.closeCleared && nextRoundUi.newTarget);
+  check('next round enables button immediately at corrected boundary', nextRoundUi.enabled && nextRoundUi.visible && nextRoundUi.closeCleared && nextRoundUi.newTarget);
   artifact.clockCheck = 'Actual ten-second window awaited; hour transition simulated in browser and prior-round DB fixture';
   console.log('Browser registration E2E passed');
 } catch (error) {

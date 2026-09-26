@@ -30,6 +30,7 @@ const remaining = element<HTMLElement>('remaining');
 const submitButton = element<HTMLButtonElement>('submit-button');
 const result = element<HTMLElement>('result');
 const HOUR_MS = 3_600_000;
+const BUTTON_PREVIEW_MS = 5 * 60_000;
 
 let serverOffsetMs = 0;
 let round: RoundResponse | null = null;
@@ -40,6 +41,7 @@ let pending = false;
 let syncInFlight = false;
 let roundError = false;
 let observedBoundary: string | null = null;
+let boundaryRetryCount = 0;
 let displayedBoardMessage = '';
 
 function serverNow() { return Date.now() + serverOffsetMs; }
@@ -99,12 +101,30 @@ function showResult(state: 'winner' | 'ranked' | 'error', title: string, detail:
   result.append(description);
 }
 
+function advanceRound() {
+  if (!round) return;
+  const startsAt = new Date(Math.max(
+    Date.parse(round.nextSlotAt), Math.floor(serverNow() / HOUR_MS) * HOUR_MS
+  )).toISOString();
+  const endsAt = new Date(Date.parse(startsAt) + HOUR_MS).toISOString();
+  applyRound({
+    serverTime: new Date(serverNow()).toISOString(),
+    currentSlot: {
+      startsAt, endsAt, message: null, attemptCount: null,
+      registrationOpen: true, registrationClosesAt: null
+    },
+    nextSlotAt: endsAt
+  });
+  void syncRound();
+}
+
 function applyRound(next: RoundResponse) {
   const previousSlot = round?.currentSlot.startsAt;
   round = next;
   if (previousSlot && previousSlot !== next.currentSlot.startsAt) {
     localWinner = null;
     registrationClosesAt = null;
+    boundaryRetryCount = 0;
     result.replaceChildren();
     delete result.dataset.state;
   }
@@ -143,16 +163,25 @@ async function syncRound() {
   } finally {
     syncInFlight = false;
     tick();
+    if (!syncInFlight && round && serverNow() >= Date.parse(round.nextSlotAt) && boundaryRetryCount < 20) {
+      boundaryRetryCount++;
+      setTimeout(() => { void syncRound(); }, 100);
+    }
   }
 }
 
 function tick() {
   if (!round) {
     roundStatus.textContent = roundError ? '서버 연결을 확인해 주세요.' : '서버 시각을 확인하는 중입니다.';
+    submitButton.hidden = true;
     submitButton.disabled = true;
     return;
   }
-  const remainingMs = Math.max(0, Date.parse(round.nextSlotAt) - serverNow());
+  const now = serverNow();
+  const remainingMs = Math.max(0, Date.parse(round.nextSlotAt) - now);
+  const registrationClosed = round.currentSlot.registrationOpen === false
+    || (registrationClosesAt !== null && now >= Date.parse(registrationClosesAt));
+  submitButton.hidden = registrationClosed && remainingMs > BUTTON_PREVIEW_MS;
   const minutes = Math.floor(remainingMs / 60_000);
   const seconds = Math.floor((remainingMs % 60_000) / 1000);
   const millis = Math.floor(remainingMs % 1000);
@@ -161,14 +190,15 @@ function tick() {
   else if (roundError) roundStatus.textContent = '전광판 갱신이 지연되고 있습니다.';
   else if (targetSlotAt && serverNow() < Date.parse(targetSlotAt)) roundStatus.textContent = '문구를 미리 입력하고 다음 정각에 등록해 주세요.';
   else if (targetSlotAt && serverNow() >= Date.parse(targetSlotAt) + HOUR_MS) roundStatus.textContent = '새 라운드를 확인하는 중입니다.';
-  else if (round.currentSlot.registrationOpen === false || (registrationClosesAt && serverNow() >= Date.parse(registrationClosesAt))) roundStatus.textContent = '이번 라운드의 등록이 마감되었습니다.';
+  else if (registrationClosed && remainingMs <= BUTTON_PREVIEW_MS) roundStatus.textContent = '다음 정각에 등록 버튼이 활성화됩니다.';
+  else if (registrationClosed) roundStatus.textContent = '이번 라운드의 등록이 마감되었습니다.';
   else if (registrationClosesAt) roundStatus.textContent = `등록 마감까지 ${Math.ceil((Date.parse(registrationClosesAt) - serverNow()) / 1000)}초`;
   else roundStatus.textContent = '현재 라운드에 등록할 수 있습니다.';
   submitButton.disabled = !canSubmit();
   submitButton.textContent = pending ? '등록 중…' : '등록하기';
   if (remainingMs === 0 && observedBoundary !== round.nextSlotAt) {
     observedBoundary = round.nextSlotAt;
-    void syncRound();
+    advanceRound();
   }
 }
 
@@ -208,6 +238,7 @@ form.addEventListener('submit', async event => {
       void syncRound();
     } else if (!response.ok && data.code === 'ROUND_NOT_STARTED') {
       showResult('error', '아직 시작 전입니다.', '다음 정각에 다시 등록해 주세요.');
+      void syncRound();
     } else if (!response.ok && data.code === 'ROUND_ENDED') {
       showResult('error', '이미 종료된 라운드입니다.', '현재 라운드 정보를 다시 불러옵니다.');
       void syncRound();

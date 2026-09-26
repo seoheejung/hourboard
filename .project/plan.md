@@ -488,6 +488,7 @@ hourboard/
 - 서버 시간 보정
 - 등록 버튼 상태 처리
 - 첫 등록 후 10초 Window 및 마감 상태 처리
+- 등록 마감 뒤 버튼 숨김, 다음 정각 5분 전 비활성 상태로 재표시, 보정된 서버 시각의 정각에 새 Round로 전환하고 서버 상태 확인
 - 1등 결과 UI
 - N등 결과 UI
 - `INVALID_SLOT` 오류 UI
@@ -502,6 +503,7 @@ hourboard/
 - `INVALID_SLOT`, `ROUND_NOT_STARTED`, `ROUND_ENDED` 처리 정상
 - `WINNER`, `RANKED` 결과가 `position`과 일치
 - 첫 등록 전 및 10초 미만에는 등록 가능, 10초 이상에는 버튼·API 등록 마감
+- 마감 후 다음 정각 5분 전까지 버튼 숨김, 정각 전에는 비활성, 보정된 서버 시각의 정각에 유효 문구의 버튼 활성 및 서버 최종 판정
 - 현재 Winner 문구가 해당 Round 종료 전까지 유지
 - 새로운 Round가 시작되면 이전 Winner 문구를 현재 전광판에 표시하지 않음
 

@@ -27,6 +27,8 @@
     "pending request blocks duplicate click": true,
     "slot clock gates registration in browser": true,
     "button disables after real ten-second window": true,
+    "button hides until five minutes before next hour": true,
+    "button remains disabled one second before next hour": true,
     "direct API attempt is rejected after close": true,
     "winner stays visible after registration closes": true,
     "mobile title is one line with new spacing": true,
@@ -34,10 +36,10 @@
     "database winner and positions remain consistent": true,
     "new round with only previous winner is open": true,
     "new round accepts a fresh winner": true,
-    "next round clears close state in browser": true
+    "next round enables button immediately at corrected boundary": true
   },
-  "slotAt": "2026-09-26T15:00:00.000Z",
-  "registrationClosesAt": "2026-09-26T15:57:33.159Z",
+  "slotAt": "2026-09-26T16:00:00.000Z",
+  "registrationClosesAt": "2026-09-26T16:10:08.444Z",
   "clockCheck": "Actual ten-second window awaited; hour transition simulated in browser and prior-round DB fixture",
   "mobile": {
     "text": "한 시간 동안 띄워드립니다",
