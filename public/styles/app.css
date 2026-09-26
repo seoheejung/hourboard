@@ -1,0 +1,56 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #17232c;
+  background: #f2f0e9;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+.layout { width: min(100% - 36px, 640px); margin: 0 auto; padding: 46px 0 72px; }
+.site-header { margin-bottom: 42px; }
+.eyebrow { color: #456574; font-size: .72rem; font-weight: 800; letter-spacing: .19em; margin: 0 0 14px; }
+.eyebrow span { margin: 0 6px; color: #8b9ba0; }
+h1 { font-size: clamp(2.35rem, 8vw, 4.25rem); line-height: 1.12; letter-spacing: -.055em; margin: 0; font-weight: 850; }
+.intro { color: #50606a; line-height: 1.6; margin: 18px 0 0; font-size: .96rem; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+h2 { margin: 0; font-size: 1.03rem; letter-spacing: -.025em; }
+.live-label { color: #295f5a; font-size: .72rem; font-weight: 850; letter-spacing: .13em; display: flex; align-items: center; gap: 7px; }
+.live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #42b89f; }
+.board { display: grid; place-items: center; min-height: 225px; padding: 30px 24px; border-radius: 14px; background: #101c26; box-shadow: 0 12px 28px rgba(21, 34, 40, .12); border: 1px solid #293c44; }
+.board p { color: #ecf6d6; font: 600 clamp(1.28rem, 5vw, 2.25rem)/1.45 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: -.05em; text-align: center; overflow-wrap: anywhere; white-space: pre-wrap; margin: 0; text-shadow: 0 0 18px rgba(174, 238, 162, .24); }
+.board-end { text-align: center; color: #56646b; font-size: .85rem; margin: 12px 0 0; }
+.attempt-section { margin-top: 45px; }
+.countdown-block { text-align: center; padding: 20px 0 32px; border-top: 1px solid #d9ddd7; }
+.countdown-block h2 { color: #50606a; font-size: .9rem; font-weight: 650; }
+.countdown { font: 700 clamp(2.9rem, 12vw, 4.75rem)/1.15 ui-monospace, "SFMono-Regular", Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: -.08em; margin: 12px 0 7px; }
+.round-status { min-height: 1.4em; color: #50606a; font-size: .85rem; margin: 0; }
+form label { display: block; font-weight: 750; margin-bottom: 10px; }
+input { display: block; width: 100%; padding: 17px 16px; border: 1px solid #acb8b6; border-radius: 9px; background: #fff; color: #17232c; font: inherit; font-size: 1rem; }
+input::placeholder { color: #829096; }
+.input-meta { display: flex; justify-content: space-between; gap: 12px; color: #627078; font-size: .75rem; margin: 8px 0 20px; }
+.input-meta p { margin: 0; }
+#remaining { flex: none; }
+button { width: 100%; min-height: 58px; border: 0; border-radius: 9px; background: #153d46; color: #fff; font: inherit; font-size: 1.02rem; font-weight: 760; cursor: pointer; }
+button:hover:not(:disabled) { background: #205564; }
+button:disabled { background: #9ba7a8; color: #f6f6f4; cursor: not-allowed; }
+:focus-visible { outline: 3px solid #ba6a22; outline-offset: 3px; }
+.result { min-height: 0; margin-top: 20px; }
+.result:not(:empty) { border: 1px solid #b7cbc6; background: #e6f1ed; border-radius: 10px; padding: 18px 20px; }
+.result[data-state="error"] { border-color: #e5c6aa; background: #fff0e3; }
+.result h2 { font-size: 1.2rem; margin-bottom: 7px; }
+.result p { margin: 0; line-height: 1.55; }
+.result .position { font: 800 2.3rem/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace; margin: 5px 0; }
+.result .support { font-size: .8rem; color: #52616a; margin-top: 8px; }
+.rules { margin-top: 38px; padding-top: 20px; border-top: 1px solid #d9ddd7; color: #58666d; font-size: .82rem; line-height: 1.65; }
+.rules p { margin: 0 0 7px; }
+.rules strong { color: #273d45; }
+@media (max-width: 420px) {
+  .layout { width: min(100% - 28px, 640px); padding-top: 30px; }
+  .site-header { margin-bottom: 34px; }
+  .board { min-height: 190px; padding: 22px 16px; }
+  .input-meta { align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

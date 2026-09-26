@@ -1,4 +1,6 @@
 import Fastify from 'fastify';
+import fastifyStatic from '@fastify/static';
+import { join } from 'node:path';
 import { readConfig } from './config/env.js';
 import { createPool } from './db/pool.js';
 import { registerAttempts } from './routes/attempts.js';
@@ -8,7 +10,11 @@ import { apiError } from './shared/types.js';
 
 const config = readConfig();
 const pool = createPool(config.databaseUrl);
-const app = Fastify({ logger: false, bodyLimit: 4096 });
+const app = Fastify({
+  logger: false,
+  bodyLimit: 4096,
+  ajv: { customOptions: { coerceTypes: false, removeAdditional: false } }
+});
 
 app.setErrorHandler((error, _request, reply) => {
   const details = error as { statusCode?: number; validation?: unknown };
@@ -20,6 +26,7 @@ app.setErrorHandler((error, _request, reply) => {
 registerHealth(app, pool);
 registerRound(app, pool);
 registerAttempts(app, pool);
+await app.register(fastifyStatic, { root: join(process.cwd(), 'public'), prefix: '/' });
 app.addHook('onClose', async () => { await pool.end(); });
 
 try {
