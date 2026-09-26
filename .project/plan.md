@@ -31,13 +31,13 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 
 **1등**
 
-> 축하합니다!  ~`
-> 가장 먼저 등록하셨습니다.  
+> 축하합니다!
+> 가장 먼저 등록하셨습니다.
 > 작성하신 문구를 다음 정각까지 띄워드립니다.
 
 **2등 이후**
 
-> 아쉽군요!  
+> 아쉽군요!
 > {position}번째로 등록하셨습니다!
 
 ---
@@ -73,7 +73,7 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 - 과거 도전 기록 조회
 - 사용자별 중복 등록 제한
 - 관리자 페이지
-- Redis~
+- Redis
 - 메시지 큐
 - 다중 API 서버 인스턴스
 - 별도 managed database
@@ -97,7 +97,7 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 | Database | PostgreSQL 18.x | UPSERT, row locking, MVCC 기반 동시성 검증 |
 | Infrastructure | OCI Compute Always Free | 단일 Linux VM |
 | Region | OCI Seoul | OCI home region이 서울인 계정 기준 |
-| Load Test | k6 | 동시 요청 및 latency 측정 |
+| Load Test | k6 | Registration Race, polling, Thundering Herd 및 latency 측정 |
 | Process | systemd | API 프로세스 상시 실행 |
 
 ### 버전 정책
@@ -110,19 +110,17 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 ---
 
 ## 6. 인프라 구조
-
 ```mermaid
 flowchart LR
     U[Browser] -->|HTTPS| A[Fastify API\nOCI Seoul VM]
     K[k6] -->|Load Test| A
     A -->|localhost:5432| P[(PostgreSQL)]
 ```
-
 ### 배치 원칙
 
 - OCI Always Free Compute는 계정 home region에서 생성
 - 서울 배포는 OCI home region이 Seoul인 계정 기준
-- VM.Standard.A1.Flex 2 OCPU / 12 GB 범위의 단일 VM을 우선 검토
+- Phase 4 시작 시 OCI 공식 문서에서 현재 Always Free Compute 조건과 제공 shape를 다시 확인하고 무료 범위 안에서 단일 VM을 선택
 - Always Free capacity 확보 실패 시 임의의 유료 shape로 변경 금지
 - API와 PostgreSQL을 동일 VM에 배치
 - PostgreSQL 5432 포트 외부 공개 금지
@@ -155,11 +153,9 @@ flowchart LR
 - 목표 Slot이 현재 활성 Slot: 첫 등록 또는 등록 Window 안의 요청만 처리
 
 등록 가능한 시간 범위:
-
 ```text
 slotAt <= serverTime < slotAt + 1 hour
 ```
-
 이 Slot 검증은 DB 접근 전에 수행한다. 첫 등록 전에는 해당 Round의 등록을 허용한다. 첫 정상 등록 시각을 `firstRegisteredAt`으로 기록하고, `registrationClosesAt = min(firstRegisteredAt + 10 seconds, slotAt + 1 hour)`로 계산한다. `serverTime >= registrationClosesAt`이면 `409 REGISTRATION_CLOSED`를 반환한다. Window 판정과 순위 증가는 동일한 PostgreSQL UPSERT에서 원자적으로 처리한다.
 
 ---
@@ -167,7 +163,6 @@ slotAt <= serverTime < slotAt + 1 hour
 ## 8. 데이터 모델
 
 ### `hour_slots`
-
 ```sql
 CREATE TABLE hour_slots (
     slot_start      TIMESTAMPTZ PRIMARY KEY,
@@ -176,7 +171,6 @@ CREATE TABLE hour_slots (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
-
 초기 버전은 시간 슬롯 하나를 row 하나로 표현한다.
 
 - `slot_start`: 시간 슬롯 고유 키
@@ -191,7 +185,6 @@ CREATE TABLE hour_slots (
 ## 9. 핵심 동시성 처리
 
 등록 요청은 SQL 1회로 승자 확정과 순번 증가를 처리한다.
-
 ```sql
 WITH db_time AS MATERIALIZED (SELECT clock_timestamp() AS at)
 INSERT INTO hour_slots (
@@ -214,7 +207,6 @@ RETURNING
     attempt_count,
     created_at;
 ```
-
 ### 처리 의미
 
 - 최초 INSERT 성공 요청: `attempt_count = 1`
@@ -228,7 +220,6 @@ RETURNING
 ### 보장해야 할 불변식
 
 동일 슬롯에서 N건의 요청이 모두 성공했을 때:
-
 ```text
 winner count = 1
 positions = 1..N
@@ -236,7 +227,6 @@ duplicate position = 0
 missing position = 0
 winner message mutation = 0
 ```
-
 순위는 브라우저 클릭 timestamp 정렬값이 아니다. 같은 row를 갱신하는 PostgreSQL 처리 결과를 기준으로 한다.
 
 ---
@@ -248,7 +238,6 @@ winner message mutation = 0
 현재 전광판과 다음 라운드 시간을 조회한다.
 
 응답 형태:
-
 ```json
 {
   "serverTime": "2026-09-26T09:32:14.120Z",
@@ -263,7 +252,6 @@ winner message mutation = 0
   "nextSlotAt": "2026-09-26T10:00:00.000Z"
 }
 ```
-
 현재 슬롯에 등록이 한 건도 없으면 `message`, `attemptCount`, `registrationClosesAt`은 `null`, `registrationOpen`은 `true`로 반환한다. 첫 등록 후에는 10초 Window와 Slot 종료 중 빠른 시각에 등록을 마감한다. 등록 마감 후에도 Winner 문구는 Slot 종료까지 표시한다.
 
 ### `POST /api/attempts`
@@ -273,16 +261,13 @@ winner message mutation = 0
 클라이언트는 도전하려는 Round의 `slotAt`과 문구를 전달한다. 서버는 시스템 시간을 기준으로 `slotAt`이 현재 등록 가능한 Round인지 검증한다.
 
 #### 요청
-
 ```json
 {
-  "targetSlotAt": "2026-09-26T10:00:00.000Z",
+  "slotAt": "2026-09-26T10:00:00.000Z",
   "message": "오늘도 살아남았다"
 }
 ```
-
 #### Winner 응답
-
 ```json
 {
   "slotAt": "2026-09-26T11:00:00.000Z",
@@ -292,9 +277,7 @@ winner message mutation = 0
   "winner": true
 }
 ```
-
 #### 2등 이후 응답
-
 ```json
 {
   "slotAt": "2026-09-26T11:00:00.000Z",
@@ -304,7 +287,6 @@ winner message mutation = 0
   "winner": false
 }
 ```
-
 등록 성공 응답은 slotAt, code, message, position, winner, registrationClosesAt 구조를 공통으로 사용한다.
 
 Winner가 아닌 응답에는 다른 사용자의 winner_message를 포함하지 않는다. 현재 전광판 상태와 Winner 문구는 GET /api/round에서 조회한다.
@@ -322,7 +304,6 @@ Winner가 아닌 응답에는 다른 사용자의 winner_message를 포함하지
 | 503 | `DATABASE_UNAVAILABLE` | PostgreSQL 연결 불가 |
 
 오류 응답은 `code`, `message`, `position`, `winner` 구조를 공통으로 사용한다.
-
 ```json
 {
   "code": "ROUND_NOT_STARTED",
@@ -331,13 +312,11 @@ Winner가 아닌 응답에는 다른 사용자의 winner_message를 포함하지
   "winner": false
 }
 ```
-
 ---
 
 ## 11. 성능 원칙
 
 등록 요청의 critical path:
-
 ```text
 request receive
 → input validation
@@ -346,15 +325,12 @@ request receive
 → response serialize
 → response send
 ```
-
 금지:
-
 ```text
 SELECT 존재 확인
 → INSERT 또는 UPDATE
 → SELECT 순위 조회
 ```
-
 필수 원칙:
 
 - 등록 요청당 PostgreSQL query 1회
@@ -366,7 +342,7 @@ SELECT 존재 확인
 - 불필요한 ORM 추상화 도입 금지
 - 성능 측정 전 임의의 cache/Redis 추가 금지
 
-절대 latency 목표는 기획 단계에서 임의로 확정하지 않는다. Phase 3에서 OCI 환경의 실제 baseline을 측정한 뒤 성능 budget을 확정한다.
+절대 latency 목표는 기획 단계에서 임의로 확정하지 않는다. Phase 3에서는 로컬 환경 baseline을 만들고, Phase 4에서는 OCI 외부 환경 baseline과 RTT를 별도로 측정한다. 두 환경의 결과를 구분한 뒤 성능 budget 필요 여부를 판단한다.
 
 측정 항목:
 
@@ -399,7 +375,6 @@ SELECT 존재 확인
 ---
 
 ## 13. Repository 구조
-
 ```text
 hourboard/
 ├─ .project/
@@ -430,7 +405,6 @@ hourboard/
 ├─ DESIGN.md
 └─ README.md
 ```
-
 ### 디렉토리 책임
 
 | 경로 | 책임 |
@@ -454,134 +428,239 @@ hourboard/
 
 ---
 
+## 현재 구현 기준
+
+Phase 1과 Phase 2 MVP 구현 및 이후 확인된 수정 사항은 적용 완료된 상태를 기준으로 한다.
+
+이 문서에서 앞으로 구현 대상으로 관리하는 범위는 **Phase 3과 Phase 4**다.
+
+Phase 1·2의 실제 구현 사실과 검증 이력은 `docs/results/*`를 우선하며, Phase 3·4에서 기존 동작을 임의로 되돌리거나 재설계하지 않는다.
+
+---
+
 ## 14. Phase 계획
 
 ### Phase 1 — Concurrency Core
 
-범위:
+**상태: 완료**
 
-- Fastify 프로젝트 초기화
-- PostgreSQL 연결
-- `hour_slots` schema
-- 현재 슬롯 계산
-- `POST /api/attempts`
-- atomic UPSERT 기반 순위 반환
-- `GET /api/round`
-- 입력 검증
-- E2E 동시성 검증
+기존 구현과 검증 결과는 `docs/results/phase1-concurrency-core.md`를 기준으로 한다.
 
-완료 기준:
-
-- 동일 슬롯 동시 요청에서 승자 1명
-- 순위 `1..N` 중복·누락 없음
-- 승자 문구 변경 없음
-- 등록 hot path DB query 1회
-- E2E 결과 아티팩트 저장
+Phase 3 작업에서 Phase 1 동시성 semantics를 임의로 변경하지 않는다.
 
 ### Phase 2 — Ticketing UI
 
-범위:
+**상태: 완료**
 
-- 전광판 화면
+현재 MVP에는 아래 동작이 반영된 상태를 기준으로 한다.
+
+- 전광판 및 빈 Slot UI
+- server time 기반 countdown
 - 문구 사전 입력
-- 다음 정각 countdown
-- 서버 시간 보정
 - 등록 버튼 상태 처리
-- 첫 등록 후 10초 Window 및 마감 상태 처리
-- 등록 마감 뒤 버튼 숨김, 다음 정각 5분 전 비활성 상태로 재표시, 보정된 서버 시각의 정각에 새 Round로 전환하고 서버 상태 확인
-- 1등 결과 UI
-- N등 결과 UI
-- `INVALID_SLOT` 오류 UI
-- `ROUND_NOT_STARTED` 오류 UI
-- `ROUND_ENDED` 오류 UI
-- 모바일 대응
-- 접근성 상태 알림
+- 첫 등록 후 10초 Registration Window
+- `REGISTRATION_CLOSED`
+- 등록 마감 후 버튼 숨김 및 다음 Round 준비
+- Winner / Ranked 결과 UI
+- 오류 및 결과 미확정 UI
+- 모바일 및 접근성 처리
+- 실제 로컬 실행 경로 검증
 
-완료 기준:
+기존 구현과 검증 결과는 `docs/results/phase2-ticketing-ui.md` 및 이후 MVP 수정 이력을 기준으로 한다.
 
-- 다음 슬롯 시작 전/후 UI 상태 전환 정상
-- `INVALID_SLOT`, `ROUND_NOT_STARTED`, `ROUND_ENDED` 처리 정상
-- `WINNER`, `RANKED` 결과가 `position`과 일치
-- 첫 등록 전 및 10초 미만에는 등록 가능, 10초 이상에는 버튼·API 등록 마감
-- 마감 후 다음 정각 5분 전까지 버튼 숨김, 정각 전에는 비활성, 보정된 서버 시각의 정각에 유효 문구의 버튼 활성 및 서버 최종 판정
-- 현재 Winner 문구가 해당 Round 종료 전까지 유지
-- 새로운 Round가 시작되면 이전 Winner 문구를 현재 전광판에 표시하지 않음
+Phase 3에서 위 기능을 다시 설계하지 않는다.
 
-### Phase 3 — Load & Race Verification
+### Phase 3 — Load, Race & Open-State Verification
+
+**상태: 다음 작업**
+
+목적은 현재 MVP의 동시성 정합성을 유지하면서 등록 race, 정각 open-state 전달 방식, polling/cache 효과, Thundering Herd를 실제 측정하는 것이다.
+
+세부 구현 기준은 `docs/instructions/phase3-load-race-verification.md`를 따른다.
+
+#### 3A. Registration Race
 
 범위:
 
-- k6 시나리오
-- 동시 요청 10 / 50 / 100 / 200 단계 측정
-- p50 / p95 / p99 기록
-- PostgreSQL lock contention 관찰
-- 순위 정합성 자동 검증
-- 반복 가능한 결과 아티팩트 생성
+- Phase 3 전용 PostgreSQL load-test database
+- k6 및 Node.js 기반 race 검증
+- concurrency 10 / 50 / 100 / 200
+- 첫 등록 후 10초 Registration Window 유지
+- `requested / accepted / registrationClosed / unexpectedFailed` 분리
+- p50 / p95 / p99
+- RPS
+- acceptance rate
+- 예상하지 못한 오류율
+- PostgreSQL `pg_stat_activity`, `pg_locks` 기반 contention 관찰
+- Winner / Position 정합성 자동 검증
+- 반복 가능한 결과 아티팩트
 
-완료 기준:
+accepted 요청 수를 `S`라고 할 때:
+```text
+S >= 1
+winner count among accepted = 1
+positions among accepted = 1..S
+duplicate position = 0
+missing position = 0
+winner message mutation = 0
+```
+`REGISTRATION_CLOSED` 요청은 Position을 소비하지 않아야 한다.
 
-- 각 부하 단계 결과 저장
-- winner 1명 검증
-- 순위 중복·누락 0건 검증
-- latency baseline 문서화
-- 병목 위치를 측정값으로 식별
+#### 3B. Open-State Delivery
+
+정각과 Registration Window 상태를 브라우저에 전달하는 세 방식을 비교한다.
+```text
+Mode A — Client Timer
+Mode B — Direct Polling
+Mode C — Cached Polling
+```
+범위:
+
+- `GET /api/open-state`
+- Client Timer baseline
+- Direct Polling
+- Phase 3 전용 local shared-cache proxy
+- Cached Polling
+- polling client 100 / 500 / 1000
+- client request count
+- origin request count
+- cache hit / miss
+- cache suppression ratio
+- p50 / p95 / p99
+- open-state detection delay
+
+`GET /api/open-state`는 UI 상태 전달용이다. 최종 등록 허용 여부는 항상 `POST /api/attempts`와 PostgreSQL이 판정한다.
+
+Cached Polling 실험은 실제 CDN이 아니라 **local shared-cache simulation**으로 기록한다.
+
+Redis는 도입하지 않는다.
+
+#### 3C. Thundering Herd
+
+범위:
+
+- concurrency 10 / 50 / 100 / 200
+- 공통 barrier를 이용한 순간 POST 집중
+- dispatch spread
+- p50 / p95 / p99
+- RPS
+- accepted / registrationClosed / unexpectedFailed
+- connection pool 대기 징후
+- PostgreSQL lock contention
+- Winner / Position 정합성
+
+실제 매시 정각을 기다리는 방식만 사용하지 않고 반복 가능한 synthetic barrier를 기준 baseline으로 사용한다.
+
+#### Phase 3 완료 기준
+
+- 기존 MVP build / E2E 재통과
+- 10초 Registration Window 정합성 유지
+- Registration Race 10 / 50 / 100 / 200 결과 존재
+- 각 race 단계 accepted Winner 1명
+- accepted Position `1..S`
+- 중복 Position 0
+- 누락 Position 0
+- Winner 문구 mutation 0
+- `REGISTRATION_CLOSED`가 Position을 소비하지 않음
+- Client Timer baseline 존재
+- Direct Polling 100 / 500 / 1000 결과 존재
+- Cached Polling 100 / 500 / 1000 결과 존재
+- client request / origin request 분리 측정
+- cache hit / miss 및 suppression ratio 기록
+- open-state detection delay 기록
+- Thundering Herd 10 / 50 / 100 / 200 결과 존재
+- dispatch spread 기록
+- PostgreSQL contention snapshot 존재
+- 측정값으로 확인된 병목과 확인하지 못한 원인을 구분
+- `k6/results/phase3/`에 반복 가능한 아티팩트 생성
+- `docs/results/phase3-load-race-verification.md` 작성
+- README에 실제 Phase 3 상태 반영
+
+Phase 3은 baseline 생성 단계다. 임의 p95/RPS 목표를 pass/fail 기준으로 만들지 않는다.
 
 ### Phase 4 — OCI Deployment
 
+**상태: 예정**
+
+Phase 3 로컬 baseline을 확보한 뒤 실제 외부 환경에서 배포·복구·보안·latency를 검증한다.
+
+세부 구현 기준은 `docs/instructions/phase4-oci-deployment.md`를 따른다.
+
 범위:
 
-- OCI Seoul VM 배포
-- Node.js 24 LTS
-- PostgreSQL 18.x
-- systemd 프로세스 실행
-- DB localhost 제한
-- 환경 변수 설정
-- HTTPS 연결
-- 실제 외부 RTT 측정
-- 배포 환경 E2E 재검증
+- OCI account home region 확인
+- Phase 4 시작 시 OCI 공식 문서에서 현재 Always Free 조건 재확인
+- home region이 Seoul이고 실제 무료 Compute 생성이 가능한 경우에만 Seoul VM 생성
+- 무료 조건이 불명확하거나 capacity가 없으면 임의 유료 resource로 전환하지 않음
+- Node.js 24 LTS 설치
+- PostgreSQL 18.x 설치
+- application deployment
+- systemd service
+- PostgreSQL `localhost:5432` 제한
+- 운영 환경 변수
+- HTTPS
+- reboot recovery
+- 실제 외부 환경 E2E
+- 핵심 Registration Race 재검증
+- 외부 RTT 및 등록 latency 측정
+- Phase 3 로컬 baseline과 Phase 4 OCI 결과를 환경별로 분리 기록
 
 완료 기준:
 
-- VM 재부팅 후 API·PostgreSQL 정상 복구
-- 외부에서 PostgreSQL 5432 접근 불가
-- HTTPS 서비스 접근 가능
-- 배포 환경에서 Phase 3 핵심 정합성 테스트 통과
+- HTTPS로 서비스 접근 가능
+- PostgreSQL 5432 외부 접근 불가
+- application 내부 포트 불필요한 외부 공개 없음
+- VM reboot 후 PostgreSQL과 HourBoard 자동 복구
+- reboot 후 HTTPS 접근 재확인
+- 배포 환경에서 Winner / Position / 10초 Registration Window 핵심 invariant 통과
+- 외부 RTT 기록
+- 등록 p50 / p95 / p99 기록
+- 로컬 Phase 3 결과와 OCI 결과를 같은 환경의 수치처럼 혼합하지 않음
+- 실제 배포 환경 결과 문서 작성
 
 ---
 
 ## 15. 현재 단계에서 구현하지 않는 확장안
 
-아래 항목은 현재 Phase에 선반영하지 않는다.
+Phase 3·4에서 아래 기능을 선반영하지 않는다.
 
 - Redis atomic counter
+- Redis 기반 open-state cache
+- Redis Sorted Set waiting room
+- Kafka
+- Message Queue
+- Virtual Waiting Room
 - 여러 API 인스턴스
 - 별도 ranking service
 - historical attempts table
 - 회원별 최고 기록
 - 리더보드
-- WebSocket/SSE
-- CDN 기반 정적 배포 분리
+- WebSocket / SSE
+- 실제 CDN / Edge 배포
+- CDN 기반 정적 자산 분리
+- 별도 managed database
+- 자동 성능 회귀 차단
+- 임의 SLO
 
-필요성이 실제 측정으로 확인되면 기획 변경 후 별도 Phase로 추가한다.
+Phase 3의 Cached Polling은 실제 CDN 구축이 아니라 **local shared-cache simulation**이다.
+
+Redis, Queue, Waiting Room은 PostgreSQL race 앞단에서 요청 순서를 바꿀 수 있으므로 Phase 3에 도입하지 않는다.
+
+Phase 3 측정 결과에서 필요성이 확인되어도 즉시 구현하지 않는다. 별도 기획 변경 후 후속 Phase로 추가한다.
 
 ---
 
 ## 16. GitHub Repository 정보
 
 ### Repository
-
 ```text
 hourboard
 ```
-
 ### Description
-
 ```text
 매 정각 가장 먼저 등록된 한 문구를 한 시간 동안 노출하고, 첫 등록 후 10초 안의 참가자에게 서버 처리 기준 순위를 반환하는 선착순 동시성 실험 서비스
 ```
-
 ### Topics
-
 ```text
 nodejs
 typescript
@@ -593,7 +672,6 @@ load-testing
 k6
 oci
 ```
-
 ---
 
 ## 17. 기술 기준 출처
