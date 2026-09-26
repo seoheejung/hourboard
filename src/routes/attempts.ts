@@ -35,7 +35,7 @@ export function registerAttempts(app: FastifyInstance, pool: pg.Pool) {
           slotAt: slot.toISOString(),
           code: winner ? 'WINNER' : 'RANKED',
           message: winner
-            ? '가장 먼저 등록하셨습니다. 작성하신 문구를 한 시간 동안 띄워드립니다.'
+            ? '가장 먼저 등록하셨습니다. 작성하신 문구를 다음 정각까지 띄워드립니다.'
             : `${position}번째로 등록하셨습니다.`,
           position,
           winner

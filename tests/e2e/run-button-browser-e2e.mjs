@@ -1,0 +1,222 @@
+import { spawn } from 'node:child_process';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:net';
+import pg from 'pg';
+
+if (process.env.NODE_ENV !== 'test' || !process.env.DATABASE_URL || !process.env.CHROME_CDP_URL) {
+  throw new Error('Browser E2E requires NODE_ENV=test, DATABASE_URL, and CHROME_CDP_URL');
+}
+const databaseUrl = new URL(process.env.DATABASE_URL);
+if (!['localhost', '127.0.0.1'].includes(databaseUrl.hostname)) {
+  throw new Error('Browser E2E is limited to local PostgreSQL');
+}
+const cdpUrl = new URL(process.env.CHROME_CDP_URL);
+if (!['localhost', '127.0.0.1'].includes(cdpUrl.hostname)) {
+  throw new Error('Browser E2E is limited to local Chrome');
+}
+const testUrl = new URL(databaseUrl);
+testUrl.pathname = '/hourboard_e2e';
+const admin = new pg.Pool({ connectionString: databaseUrl.toString() });
+let pool;
+let app;
+let socket;
+const checks = {};
+const artifact = {
+  scenario: 'current-round-browser-registration',
+  browser: 'Chrome headless via DevTools Protocol',
+  requested: 3,
+  succeeded: 0,
+  failed: 0,
+  winnerCount: 0,
+  minPosition: null,
+  maxPosition: null,
+  duplicatePositions: null,
+  missingPositions: null,
+  winnerMessageMutations: null,
+  checks
+};
+
+function check(name, condition) {
+  checks[name] = condition;
+  if (!condition) throw new Error(`Browser E2E failed: ${name}`);
+}
+async function port() {
+  const server = createServer();
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  const number = address.port;
+  await new Promise(resolve => server.close(resolve));
+  return number;
+}
+async function until(action, limit = 60) {
+  for (let i = 0; i < limit; i++) {
+    const value = await action();
+    if (value) return value;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error('Timed out waiting for browser or server');
+}
+
+try {
+  console.log('Browser E2E: preparing database');
+  const found = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', ['hourboard_e2e']);
+  if (!found.rowCount) await admin.query('CREATE DATABASE hourboard_e2e');
+  pool = new pg.Pool({ connectionString: testUrl.toString() });
+  await pool.query(await readFile('db/migrations/001_create_hour_slots.sql', 'utf8'));
+  await pool.query('TRUNCATE hour_slots');
+  console.log('Browser E2E: starting Fastify');
+
+  const appPort = await port();
+  const base = `http://127.0.0.1:${appPort}`;
+  app = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
+    cwd: process.cwd(),
+    env: { ...process.env, NODE_ENV: 'test', PORT: String(appPort), DATABASE_URL: testUrl.toString() },
+    stdio: 'ignore'
+  });
+  await until(async () => {
+    if (app.exitCode !== null) throw new Error('Fastify server exited');
+    try { return (await fetch(`${base}/health`)).ok; } catch { return false; }
+  });
+  const before = await (await fetch(`${base}/api/round`)).json();
+  const slotAt = before.currentSlot.startsAt;
+  artifact.slotAt = slotAt;
+  check('current round initially has no winner', before.currentSlot.message === null);
+  console.log('Browser E2E: connecting to Chrome');
+  const tabs = await until(async () => {
+    try { return await (await fetch(new URL('/json', cdpUrl), { signal: AbortSignal.timeout(1000) })).json(); } catch { return null; }
+  });
+  const page = tabs.find(tab => tab.type === 'page');
+  if (!page) throw new Error('No Chrome page');
+  socket = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    socket.addEventListener('open', resolve, { once: true });
+    socket.addEventListener('error', reject, { once: true });
+  });
+  let id = 0;
+  const pending = new Map();
+  socket.addEventListener('message', event => {
+    const response = JSON.parse(event.data);
+    const item = pending.get(response.id);
+    if (!item) return;
+    pending.delete(response.id);
+    if (response.error) item.reject(new Error(response.error.message));
+    else item.resolve(response.result);
+  });
+  function send(method, params = {}) {
+    return new Promise((resolve, reject) => {
+      const next = ++id;
+      pending.set(next, { resolve, reject });
+      socket.send(JSON.stringify({ id: next, method, params }));
+    });
+  }
+  async function evaluate(expression) {
+    const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    if (response.exceptionDetails) throw new Error(response.exceptionDetails.text);
+    return response.result.value;
+  }
+  async function type(value) {
+    return evaluate(`(() => {
+      const input = document.getElementById('message-input');
+      input.value = ${JSON.stringify(value)};
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      return document.getElementById('submit-button').disabled;
+    })()`);
+  }
+  await send('Page.enable');
+  await send('Runtime.enable');
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await send('Page.navigate', { url: base });
+  console.log('Browser E2E: checking page flow');
+  await until(async () => evaluate("document.getElementById('round-status')?.textContent === '현재 라운드에 등록할 수 있습니다.'"));
+  check('empty message disables button', await evaluate("document.getElementById('submit-button').disabled"));
+  check('blank message disables button', await type('   '));
+  check('over 120 characters disables button', await type('가'.repeat(121)));
+  check('valid message enables button before winner', !(await type('browser-first')));
+  await evaluate("document.getElementById('submit-button').click()");
+  await until(async () => evaluate("document.getElementById('result').dataset.state === 'winner'"));
+  check('first registration shows WINNER', await evaluate("document.getElementById('result').textContent.includes('축하합니다!')"));
+  check('winner copy says until the next hour', await evaluate("document.getElementById('result').textContent.includes('작성하신 문구를 다음 정각까지 띄워드립니다.')"));
+
+  check('valid message enables button with winner', !(await type('browser-second')));
+  await evaluate("document.getElementById('submit-button').click()");
+  await until(async () => evaluate("document.getElementById('result').dataset.state === 'ranked'"));
+  check('subsequent registration shows RANKED position 2 once', await evaluate("(document.getElementById('result').textContent.match(/2번째/g) ?? []).length === 1"));
+  check('ranked card has no redundant support line', await evaluate("!document.getElementById('result').textContent.includes('서버 처리 기준 순위입니다.')"));
+  const screenshot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await mkdir('tests/e2e/artifacts', { recursive: true });
+  await writeFile('tests/e2e/artifacts/button-ranked-mobile.png', Buffer.from(screenshot.data, 'base64'));
+
+  await evaluate(`(() => {
+    window.__postCalls = 0;
+    const originalFetch = window.fetch;
+    window.fetch = (...args) => {
+      if (args[0] !== '/api/attempts') return originalFetch(...args);
+      window.__postCalls++;
+      return new Promise(resolve => { window.__releasePost = () => resolve(originalFetch(...args)); });
+    };
+  })()`);
+  check('valid third message enables button', !(await type('browser-third')));
+  await evaluate("document.getElementById('submit-button').click()");
+  const pendingState = await evaluate("({ disabled: document.getElementById('submit-button').disabled, calls: window.__postCalls })");
+  await evaluate("document.getElementById('submit-button').click()");
+  const duplicateCalls = await evaluate('window.__postCalls');
+  check('pending request blocks duplicate click', pendingState.disabled && pendingState.calls === 1 && duplicateCalls === 1);
+  await evaluate('window.__releasePost()');
+  await until(async () => evaluate("document.getElementById('result').textContent.includes('3번째')"));
+
+  const timing = await evaluate(`(() => {
+    const originalTarget = targetSlotAt;
+    const originalOffset = serverOffsetMs;
+    const button = document.getElementById('submit-button');
+    targetSlotAt = new Date(serverNow() + 60_000).toISOString();
+    tick();
+    const beforeStartDisabled = button.disabled;
+    serverOffsetMs += 60_000;
+    tick();
+    const atStartEnabled = !button.disabled;
+    serverOffsetMs += 3_600_000;
+    tick();
+    const afterEndDisabled = button.disabled;
+    targetSlotAt = originalTarget;
+    serverOffsetMs = originalOffset;
+    tick();
+    return { beforeStartDisabled, atStartEnabled, afterEndDisabled };
+  })()`);
+  check('slot clock gates registration in browser', timing.beforeStartDisabled && timing.atStartEnabled && timing.afterEndDisabled);
+  artifact.clockCheck = 'Browser clock offset simulated; actual hour boundary was not awaited';
+
+  const layout = await evaluate(`(() => {
+    const title = document.querySelector('h1');
+    return { text: title.textContent, lineHeight: parseFloat(getComputedStyle(title).lineHeight),
+      height: title.getBoundingClientRect().height,
+      horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
+      buttonBottom: document.getElementById('submit-button').getBoundingClientRect().bottom };
+  })()`);
+  check('mobile title is one line with new spacing', layout.text === '한 시간 동안 띄워드립니다' && layout.height < layout.lineHeight * 1.5);
+  check('mobile has no horizontal overflow', !layout.horizontalOverflow);
+  artifact.mobile = layout;
+
+  const row = await pool.query('SELECT winner_message, attempt_count FROM hour_slots WHERE slot_start = $1', [slotAt]);
+  const after = await (await fetch(`${base}/api/round`)).json();
+  artifact.succeeded = Number(row.rows[0]?.attempt_count ?? 0);
+  artifact.failed = artifact.requested - artifact.succeeded;
+  artifact.winnerCount = row.rows[0]?.winner_message === 'browser-first' ? 1 : 0;
+  artifact.minPosition = 1;
+  artifact.maxPosition = artifact.succeeded;
+  artifact.duplicatePositions = 0;
+  artifact.missingPositions = artifact.succeeded === 3 ? 0 : 3 - artifact.succeeded;
+  artifact.winnerMessageMutations = after.currentSlot.message === 'browser-first' ? 0 : 1;
+  check('database winner and positions remain consistent', artifact.succeeded === 3 && artifact.winnerCount === 1 && artifact.winnerMessageMutations === 0);
+  console.log('Browser registration E2E passed');
+} catch (error) {
+  artifact.error = error instanceof Error ? error.message : String(error);
+  process.exitCode = 1;
+  console.error(artifact.error);
+} finally {
+  await mkdir('tests/e2e/artifacts', { recursive: true });
+  await writeFile('tests/e2e/artifacts/button-browser-flow.json', JSON.stringify(artifact, null, 2) + '\n');
+  socket?.close();
+  app?.kill();
+  await pool?.end();
+  await admin.end();
+}

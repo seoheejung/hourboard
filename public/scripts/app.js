@@ -6,6 +6,7 @@ function element(id) {
     return found;
 }
 const board = element('board-message');
+const boardHeading = element('board-heading');
 const endsAt = element('ends-at');
 const countdown = element('countdown');
 const roundStatus = element('round-status');
@@ -23,11 +24,11 @@ let pending = false;
 let syncInFlight = false;
 let roundError = false;
 let observedBoundary = null;
-let preferCurrentOnNextSync = false;
+let displayedBoardMessage = '';
 function serverNow() { return Date.now() + serverOffsetMs; }
 function validMessage() {
-    const value = input.value.trim();
-    return value.length > 0 && Array.from(value).length <= 120 && !/[\r\n\u2028\u2029]/u.test(value);
+    const value = input.value;
+    return value.trim().length > 0 && Array.from(value).length <= 120 && !/[\r\n\u2028\u2029]/u.test(value);
 }
 function canSubmit() {
     if (!targetSlotAt || pending || !validMessage())
@@ -41,27 +42,41 @@ function formatTime(value) {
         timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23'
     }).format(new Date(value));
 }
-function showResult(state, title, detail, position) {
+function formatHour(value) {
+    const parts = new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul', hour: 'numeric', hour12: false, hourCycle: 'h23'
+    }).formatToParts(new Date(value));
+    return Number(parts.find(part => part.type === 'hour')?.value);
+}
+function showBoardMessage(message) {
+    if (displayedBoardMessage === message)
+        return;
+    displayedBoardMessage = message;
+    board.classList.remove('is-scrolling');
+    board.textContent = '';
+    board.parentElement?.setAttribute('aria-label', message);
+    board.setAttribute('aria-hidden', 'true');
+    const group = document.createElement('span');
+    group.className = 'ticker-group';
+    group.textContent = `${message}　　`;
+    board.append(group);
+    const visibleWidth = board.parentElement?.clientWidth ?? 0;
+    while (group.getBoundingClientRect().width < visibleWidth + 80) {
+        group.textContent += `${message}　　`;
+    }
+    board.append(group.cloneNode(true));
+    board.style.setProperty('--ticker-duration', `${Math.max(10, group.getBoundingClientRect().width / 55)}s`);
+    board.classList.add('is-scrolling');
+}
+function showResult(state, title, detail) {
     result.replaceChildren();
     result.dataset.state = state;
     const heading = document.createElement('h2');
     heading.textContent = title;
     result.append(heading);
-    if (position !== undefined) {
-        const rank = document.createElement('p');
-        rank.className = 'position';
-        rank.textContent = `${position}번째`;
-        result.append(rank);
-    }
     const description = document.createElement('p');
     description.textContent = detail;
     result.append(description);
-    if (state === 'ranked') {
-        const support = document.createElement('p');
-        support.className = 'support';
-        support.textContent = '서버 처리 기준 순위입니다.';
-        result.append(support);
-    }
 }
 function applyRound(next) {
     const previousSlot = round?.currentSlot.startsAt;
@@ -71,16 +86,11 @@ function applyRound(next) {
         result.replaceChildren();
         delete result.dataset.state;
     }
-    if (preferCurrentOnNextSync) {
-        targetSlotAt = next.currentSlot.startsAt;
-        preferCurrentOnNextSync = false;
-    }
-    else if (!targetSlotAt || serverNow() >= Date.parse(targetSlotAt) + HOUR_MS) {
-        targetSlotAt = next.nextSlotAt;
-    }
+    targetSlotAt = next.currentSlot.startsAt;
     if (localWinner?.slotAt !== next.currentSlot.startsAt)
         localWinner = null;
-    board.textContent = next.currentSlot.message ?? localWinner?.message ?? '아직 등록된 문구가 없습니다.';
+    boardHeading.textContent = `${formatHour(next.currentSlot.startsAt)}시 전광판`;
+    showBoardMessage(next.currentSlot.message ?? localWinner?.message ?? '아직 등록된 문구가 없습니다.');
     endsAt.textContent = `이 문구는 ${formatTime(next.currentSlot.endsAt)}까지 표시됩니다.`;
     observedBoundary = null;
     tick();
@@ -104,7 +114,7 @@ async function syncRound() {
     catch {
         roundError = true;
         if (!round) {
-            board.textContent = '현재 전광판을 불러오지 못했습니다.';
+            showBoardMessage('전광판을 불러오지 못했습니다.');
             endsAt.textContent = '서버 연결을 확인해 주세요.';
         }
     }
@@ -130,6 +140,8 @@ function tick() {
         roundStatus.textContent = '전광판 갱신이 지연되고 있습니다.';
     else if (targetSlotAt && serverNow() < Date.parse(targetSlotAt))
         roundStatus.textContent = '문구를 미리 입력하고 다음 정각에 등록해 주세요.';
+    else if (targetSlotAt && serverNow() >= Date.parse(targetSlotAt) + HOUR_MS)
+        roundStatus.textContent = '새 라운드를 확인하는 중입니다.';
     else
         roundStatus.textContent = '현재 라운드에 등록할 수 있습니다.';
     submitButton.disabled = !canSubmit();
@@ -140,10 +152,9 @@ function tick() {
     }
 }
 input.addEventListener('input', () => {
-    const chars = Array.from(input.value);
-    if (chars.length > 120)
-        input.value = chars.slice(0, 120).join('');
-    remaining.textContent = `${120 - Array.from(input.value).length}자 남음`;
+    const left = 120 - Array.from(input.value).length;
+    remaining.textContent = left >= 0 ? `${left}자 남음` : `${-left}자 초과`;
+    input.setAttribute('aria-invalid', String(left < 0));
     tick();
 });
 form.addEventListener('submit', async (event) => {
@@ -164,10 +175,10 @@ form.addEventListener('submit', async (event) => {
             showResult('winner', '축하합니다!', data.message);
             localWinner = { slotAt, message };
             if (round?.currentSlot.startsAt === slotAt)
-                board.textContent = message;
+                showBoardMessage(message);
         }
         else if (response.ok && data.slotAt === slotAt && data.code === 'RANKED' && Number.isInteger(data.position) && data.position >= 2 && data.winner === false) {
-            showResult('ranked', '아쉽군요!', data.message, data.position);
+            showResult('ranked', '아쉽군요!', data.message);
             void syncRound();
         }
         else if (!response.ok && data.code === 'INVALID_REQUEST') {
@@ -175,7 +186,6 @@ form.addEventListener('submit', async (event) => {
         }
         else if (!response.ok && data.code === 'INVALID_SLOT') {
             showResult('error', '라운드 정보를 확인해 주세요.', '현재 라운드 정보를 다시 불러옵니다.');
-            preferCurrentOnNextSync = true;
             void syncRound();
         }
         else if (!response.ok && data.code === 'ROUND_NOT_STARTED') {
@@ -183,7 +193,6 @@ form.addEventListener('submit', async (event) => {
         }
         else if (!response.ok && data.code === 'ROUND_ENDED') {
             showResult('error', '이미 종료된 라운드입니다.', '현재 라운드 정보를 다시 불러옵니다.');
-            preferCurrentOnNextSync = true;
             void syncRound();
         }
         else {

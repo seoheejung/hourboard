@@ -27,6 +27,12 @@ registerHealth(app, pool);
 registerRound(app, pool);
 registerAttempts(app, pool);
 await app.register(fastifyStatic, { root: join(process.cwd(), 'public'), prefix: '/' });
+app.setNotFoundHandler((request, reply) => {
+  if (request.url.startsWith('/api/')) {
+    return reply.code(404).send({ code: 'NOT_FOUND', message: 'API 경로를 찾을 수 없습니다.', position: null, winner: false });
+  }
+  return reply.code(404).sendFile('404.html');
+});
 app.addHook('onClose', async () => { await pool.end(); });
 
 try {

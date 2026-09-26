@@ -1,0 +1,40 @@
+{
+  "scenario": "current-round-browser-registration",
+  "browser": "Chrome headless via DevTools Protocol",
+  "requested": 3,
+  "succeeded": 3,
+  "failed": 0,
+  "winnerCount": 1,
+  "minPosition": 1,
+  "maxPosition": 3,
+  "duplicatePositions": 0,
+  "missingPositions": 0,
+  "winnerMessageMutations": 0,
+  "checks": {
+    "current round initially has no winner": true,
+    "empty message disables button": true,
+    "blank message disables button": true,
+    "over 120 characters disables button": true,
+    "valid message enables button before winner": true,
+    "first registration shows WINNER": true,
+    "winner copy says until the next hour": true,
+    "valid message enables button with winner": true,
+    "subsequent registration shows RANKED position 2 once": true,
+    "ranked card has no redundant support line": true,
+    "valid third message enables button": true,
+    "pending request blocks duplicate click": true,
+    "slot clock gates registration in browser": true,
+    "mobile title is one line with new spacing": true,
+    "mobile has no horizontal overflow": true,
+    "database winner and positions remain consistent": true
+  },
+  "slotAt": "2026-09-26T15:00:00.000Z",
+  "clockCheck": "Browser clock offset simulated; actual hour boundary was not awaited",
+  "mobile": {
+    "text": "한 시간 동안 띄워드립니다",
+    "lineHeight": 25.056,
+    "height": 25.046875,
+    "horizontalOverflow": false,
+    "buttonBottom": 668.359375
+  }
+}
