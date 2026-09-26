@@ -39,7 +39,7 @@ form label { display: block; font-weight: 750; margin-bottom: 7px; font-size: .9
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 input { display: block; width: 100%; min-width: 0; padding: 12px 14px; border: 1px solid #728780; border-radius: 9px; background: #f5f8f6; color: #17232c; font: inherit; font-size: 1rem; }
 input[aria-invalid="true"] { border-color: #ffac81; }
-.input-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 12px; color: #aebfba; font-size: .75rem; margin: 6px 0 12px; }
+.input-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 12px; color: #aebfba; font-size: .7rem; margin: 6px 0 12px; }
 .input-meta p { margin: 0; }
 #remaining { flex: none; }
 button { width: 100%; min-height: 50px; border: 0; border-radius: 9px; background: #45b978; color: #0d2017; font: inherit; font-size: 1.02rem; font-weight: 760; cursor: pointer; }
