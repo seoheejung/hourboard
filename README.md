@@ -254,6 +254,8 @@ cp .env.example .env
 
 필요한 경우 `.env`의 `DATABASE_URL`, `PORT`를 로컬 환경에 맞게 수정한다.
 
+서버와 migration은 실행 시 `.env`를 읽는다. 이미 셸에 설정한 환경 변수는 `.env` 값보다 우선한다.
+
 ### 3. PostgreSQL 실행
 
 ```bash

@@ -1,4 +1,10 @@
+import { existsSync } from 'node:fs';
+import { loadEnvFile } from 'node:process';
+
 export function readConfig() {
+  if ((!process.env.NODE_ENV || !process.env.PORT || !process.env.DATABASE_URL) && existsSync('.env')) {
+    loadEnvFile();
+  }
   const { NODE_ENV, PORT, DATABASE_URL } = process.env;
   if (!NODE_ENV || !['development', 'test', 'production'].includes(NODE_ENV)) {
     throw new Error('NODE_ENV must be development, test, or production');
