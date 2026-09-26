@@ -11,13 +11,19 @@ export function registerRound(app: FastifyInstance, pool: pg.Pool) {
     const end = nextSlot(slot);
     try {
       const row = await getSlot(pool, slot);
+      const responseTime = new Date();
+      const registrationClosesAt = row
+        ? new Date(Math.min(row.created_at.getTime() + 10_000, end.getTime()))
+        : null;
       return {
-        serverTime: now.toISOString(),
+        serverTime: responseTime.toISOString(),
         currentSlot: {
           startsAt: slot.toISOString(),
           endsAt: end.toISOString(),
           message: row?.winner_message ?? null,
-          attemptCount: row ? Number(row.attempt_count) : null
+          attemptCount: row ? Number(row.attempt_count) : null,
+          registrationOpen: responseTime < end && (!registrationClosesAt || responseTime < registrationClosesAt),
+          registrationClosesAt: registrationClosesAt?.toISOString() ?? null
         },
         nextSlotAt: end.toISOString()
       };

@@ -73,14 +73,14 @@ try {
   check('plain text winner rendering', source.includes('board.textContent =') && !source.includes('innerHTML'));
   check('countdown uses server time', source.includes('data.serverTime') && source.includes('serverOffsetMs') && script.includes('serverOffsetMs'));
   check('submitting blocks duplicate clicks', source.includes('if (!canSubmit()') && source.includes('pending = true') && source.includes('submitButton.disabled = !canSubmit()'));
-  check('error UI states', ['INVALID_REQUEST', 'INVALID_SLOT', 'ROUND_NOT_STARTED', 'ROUND_ENDED'].every(code => source.includes(code)));
+  check('error UI states', ['INVALID_REQUEST', 'INVALID_SLOT', 'ROUND_NOT_STARTED', 'ROUND_ENDED', 'REGISTRATION_CLOSED'].every(code => source.includes(code)));
 
   const roundResponse = await fetch(`${base}/api/round`);
-  const round = await roundResponse.json() as { serverTime: string; currentSlot: { startsAt: string; endsAt: string; message: string | null; attemptCount: number | null }; nextSlotAt: string };
+  const round = await roundResponse.json() as { serverTime: string; currentSlot: { startsAt: string; endsAt: string; message: string | null; attemptCount: number | null; registrationOpen: boolean; registrationClosesAt: string | null }; nextSlotAt: string };
   artifact.roundStatus = roundResponse.status;
   const slotAt = round.currentSlot.startsAt;
   artifact.slotAt = slotAt;
-  check('round response contract', roundResponse.status === 200 && Number.isFinite(Date.parse(round.serverTime)) && round.currentSlot.message === null && round.currentSlot.attemptCount === null && Date.parse(round.currentSlot.endsAt) - Date.parse(slotAt) === 3_600_000 && round.nextSlotAt === round.currentSlot.endsAt);
+  check('round response contract', roundResponse.status === 200 && Number.isFinite(Date.parse(round.serverTime)) && round.currentSlot.message === null && round.currentSlot.attemptCount === null && round.currentSlot.registrationOpen === true && round.currentSlot.registrationClosesAt === null && Date.parse(round.currentSlot.endsAt) - Date.parse(slotAt) === 3_600_000 && round.nextSlotAt === round.currentSlot.endsAt);
 
   const oldSlot = new Date(Date.parse(slotAt) - 3_600_000);
   await pool.query('INSERT INTO hour_slots (slot_start, winner_message) VALUES ($1, $2)', [oldSlot, 'old winner']);
@@ -92,7 +92,7 @@ try {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ slotAt: target, message })
     });
-    return { status: response.status, body: await response.json() as { slotAt?: string; code: string; position: number | null; winner: boolean } };
+    return { status: response.status, body: await response.json() as { slotAt?: string; code: string; position: number | null; winner: boolean; registrationClosesAt?: string } };
   };
   const winnerMessage = '<img src=x onerror=alert(1)>';
   const first = await request(slotAt, winnerMessage);
@@ -116,9 +116,12 @@ try {
   artifact.missingPositions = first.body.position === 1 && second.body.position === 2 ? 0 : 1;
   const displayed = await (await fetch(`${base}/api/round`)).json() as typeof round;
   artifact.winnerMessageMutations = displayed.currentSlot.message === winnerMessage ? 0 : 1;
-  check('winner contract', first.status === 200 && first.body.code === 'WINNER' && first.body.position === 1 && first.body.winner === true && first.body.slotAt === slotAt);
+  check('winner contract', first.status === 200 && first.body.code === 'WINNER' && first.body.position === 1 && first.body.winner === true && first.body.slotAt === slotAt && Number.isFinite(Date.parse(first.body.registrationClosesAt ?? '')));
   check('ranked contract', second.status === 200 && second.body.code === 'RANKED' && second.body.position === 2 && second.body.winner === false && second.body.slotAt === slotAt);
-  check('winner message persists as text', displayed.currentSlot.message === winnerMessage && displayed.currentSlot.attemptCount === 2);
+  check('winner message persists as text', displayed.currentSlot.message === winnerMessage && displayed.currentSlot.attemptCount === 2 && displayed.currentSlot.registrationClosesAt === first.body.registrationClosesAt);
+  await pool.query("UPDATE hour_slots SET created_at = slot_start + INTERVAL '1 hour' - INTERVAL '5 seconds' WHERE slot_start = $1", [slotAt]);
+  const cappedRound = await (await fetch(`${base}/api/round`)).json() as typeof round;
+  check('registration close is capped at slot end', cappedRound.currentSlot.registrationClosesAt === round.currentSlot.endsAt);
   check('invalid slot response', invalid.status === 400 && invalid.body.code === 'INVALID_SLOT');
   check('future slot response', future.status === 425 && future.body.code === 'ROUND_NOT_STARTED');
   check('ended slot response', ended.status === 409 && ended.body.code === 'ROUND_ENDED');

@@ -5,7 +5,7 @@
 - **프로젝트명:** HourBoard
 - **사이트명:** 한시간동안 띄워드립니다
 - **GitHub Repository:** `hourboard`
-- **한 줄 설명:** 매 정각 가장 먼저 등록된 한 문구를 한 시간 동안 노출하고, 모든 참가자에게 서버 처리 기준 순위를 반환하는 선착순 동시성 실험 서비스
+- **한 줄 설명:** 매 정각 가장 먼저 등록된 한 문구를 한 시간 동안 노출하고, 첫 등록 후 10초 안의 참가자에게 서버 처리 기준 순위를 반환하는 선착순 동시성 실험 서비스
 
 HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 경쟁시키는 웹 서비스다. 가장 먼저 처리된 요청의 문구만 해당 시간의 전광판을 차지한다. 이후 요청은 전광판을 변경하지 못하며 자신이 몇 번째로 처리되었는지 즉시 확인한다.
 
@@ -20,11 +20,12 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 3. 등록 요청은 목표 시간 슬롯이 실제로 시작된 뒤에만 허용한다.
 4. 해당 슬롯에서 PostgreSQL이 처음 확정한 요청 1건만 승자가 된다.
 5. 승자의 문구는 다음 정각 전까지 전광판에 노출한다.
-6. 모든 성공 요청은 `1, 2, 3 ... N` 형태의 고유 순위를 받는다.
-7. 순위 기준은 브라우저 클릭 시각이 아니라 서버와 PostgreSQL이 요청을 처리한 순서다.
-8. 한 HTTP 등록 요청을 한 번의 도전으로 취급한다.
-9. 초기 버전은 로그인, 사용자 계정, 과거 순위 복구를 제공하지 않는다.
-10. 전광판 문구에는 HTML을 허용하지 않고 일반 문자열만 저장·출력한다.
+6. 첫 등록 전에는 등록을 허용하고, 첫 정상 등록부터 10초 미만 동안만 후속 등록을 허용한다.
+7. 모든 성공 요청은 `1, 2, 3 ... N` 형태의 고유 순위를 받는다.
+8. 순위 기준은 브라우저 클릭 시각이 아니라 서버와 PostgreSQL이 요청을 처리한 순서다.
+9. 한 HTTP 등록 요청을 한 번의 도전으로 취급한다.
+10. 초기 버전은 로그인, 사용자 계정, 과거 순위 복구를 제공하지 않는다.
+11. 전광판 문구에는 HTML을 허용하지 않고 일반 문자열만 저장·출력한다.
 
 ### 사용자 문구
 
@@ -151,7 +152,7 @@ flowchart LR
 - `slotAt` 형식 오류 또는 정각이 아님: `400 INVALID_SLOT`
 - 목표 Slot이 아직 시작 전: `425 ROUND_NOT_STARTED`
 - 목표 Slot이 이미 종료: `409 ROUND_ENDED`
-- 목표 Slot이 현재 활성 Slot: 등록 처리
+- 목표 Slot이 현재 활성 Slot: 첫 등록 또는 등록 Window 안의 요청만 처리
 
 등록 가능한 시간 범위:
 
@@ -159,7 +160,7 @@ flowchart LR
 slotAt <= serverTime < slotAt + 1 hour
 ```
 
-이 검증은 DB 접근 전에 수행한다.
+이 Slot 검증은 DB 접근 전에 수행한다. 첫 등록 전에는 해당 Round의 등록을 허용한다. 첫 정상 등록 시각을 `firstRegisteredAt`으로 기록하고, `registrationClosesAt = min(firstRegisteredAt + 10 seconds, slotAt + 1 hour)`로 계산한다. `serverTime >= registrationClosesAt`이면 `409 REGISTRATION_CLOSED`를 반환한다. Window 판정과 순위 증가는 동일한 PostgreSQL UPSERT에서 원자적으로 처리한다.
 
 ---
 
@@ -181,7 +182,7 @@ CREATE TABLE hour_slots (
 - `slot_start`: 시간 슬롯 고유 키
 - `winner_message`: 최초 요청의 문구
 - `attempt_count`: 해당 슬롯에서 처리된 요청 수이자 최신 순번
-- `created_at`: 승자 확정 시각
+- `created_at`: 첫 정상 등록 시각 (`firstRegisteredAt`)
 
 참가자 전체 기록을 별도 테이블에 저장하지 않는다. 등록 hot path를 단일 row write로 유지하기 위한 결정이다.
 
@@ -192,15 +193,21 @@ CREATE TABLE hour_slots (
 등록 요청은 SQL 1회로 승자 확정과 순번 증가를 처리한다.
 
 ```sql
+WITH db_time AS MATERIALIZED (SELECT clock_timestamp() AS at)
 INSERT INTO hour_slots (
     slot_start,
     winner_message,
-    attempt_count
+    attempt_count,
+    created_at
 )
-VALUES ($1, $2, 1)
+SELECT $1, $2, 1, db_time.at
+FROM db_time
+WHERE db_time.at >= $1::timestamptz
+  AND db_time.at < $1::timestamptz + INTERVAL '1 hour'
 ON CONFLICT (slot_start)
 DO UPDATE
 SET attempt_count = hour_slots.attempt_count + 1
+WHERE clock_timestamp() < LEAST(hour_slots.created_at + INTERVAL '10 seconds', hour_slots.slot_start + INTERVAL '1 hour')
 RETURNING
     slot_start,
     winner_message,
@@ -213,6 +220,8 @@ RETURNING
 - 최초 INSERT 성공 요청: `attempt_count = 1`
 - 이후 충돌 요청: 기존 row의 `attempt_count + 1`
 - `winner_message`는 conflict update에서 수정하지 않음
+- conflict update의 `WHERE`는 row lock 획득 뒤의 DB 시각으로 등록 마감 판정
+- 마감 시각 이후에는 row update 없이 `409 REGISTRATION_CLOSED` 반환
 - `attempt_count === 1`이면 승자
 - 반환된 `attempt_count`가 사용자 순위
 
@@ -247,13 +256,15 @@ winner message mutation = 0
     "startsAt": "2026-09-26T09:00:00.000Z",
     "endsAt": "2026-09-26T10:00:00.000Z",
     "message": "오늘은 칼퇴합니다",
-    "attemptCount": 438
+    "attemptCount": 438,
+    "registrationOpen": false,
+    "registrationClosesAt": "2026-09-26T09:00:10.000Z"
   },
   "nextSlotAt": "2026-09-26T10:00:00.000Z"
 }
 ```
 
-현재 슬롯에 등록이 한 건도 없으면 `message`와 `attemptCount`는 `null`로 반환한다.
+현재 슬롯에 등록이 한 건도 없으면 `message`, `attemptCount`, `registrationClosesAt`은 `null`, `registrationOpen`은 `true`로 반환한다. 첫 등록 후에는 10초 Window와 Slot 종료 중 빠른 시각에 등록을 마감한다. 등록 마감 후에도 Winner 문구는 Slot 종료까지 표시한다.
 
 ### `POST /api/attempts`
 
@@ -294,7 +305,7 @@ winner message mutation = 0
 }
 ```
 
-등록 성공 응답은 slotAt, code, message, position, winner 구조를 공통으로 사용한다.
+등록 성공 응답은 slotAt, code, message, position, winner, registrationClosesAt 구조를 공통으로 사용한다.
 
 Winner가 아닌 응답에는 다른 사용자의 winner_message를 포함하지 않는다. 현재 전광판 상태와 Winner 문구는 GET /api/round에서 조회한다.
 
@@ -305,6 +316,7 @@ Winner가 아닌 응답에는 다른 사용자의 winner_message를 포함하지
 | 400 | `INVALID_REQUEST` | 요청 본문 또는 입력 형식 오류 |
 | 400 | `INVALID_SLOT` | `slotAt` 형식 오류 또는 정각이 아닌 Slot |
 | 409 | `ROUND_ENDED` | 목표 Round 종료 |
+| 409 | `REGISTRATION_CLOSED` | 첫 등록 후 10초 Window 종료 |
 | 425 | `ROUND_NOT_STARTED` | 목표 Round 시작 전 |
 | 500 | `INTERNAL_ERROR` | 서버 내부 처리 실패 |
 | 503 | `DATABASE_UNAVAILABLE` | PostgreSQL 연결 불가 |
@@ -475,6 +487,7 @@ hourboard/
 - 다음 정각 countdown
 - 서버 시간 보정
 - 등록 버튼 상태 처리
+- 첫 등록 후 10초 Window 및 마감 상태 처리
 - 1등 결과 UI
 - N등 결과 UI
 - `INVALID_SLOT` 오류 UI
@@ -488,6 +501,7 @@ hourboard/
 - 다음 슬롯 시작 전/후 UI 상태 전환 정상
 - `INVALID_SLOT`, `ROUND_NOT_STARTED`, `ROUND_ENDED` 처리 정상
 - `WINNER`, `RANKED` 결과가 `position`과 일치
+- 첫 등록 전 및 10초 미만에는 등록 가능, 10초 이상에는 버튼·API 등록 마감
 - 현재 Winner 문구가 해당 Round 종료 전까지 유지
 - 새로운 Round가 시작되면 이전 Winner 문구를 현재 전광판에 표시하지 않음
 
@@ -561,7 +575,7 @@ hourboard
 ### Description
 
 ```text
-매 정각 가장 먼저 등록된 한 문구를 한 시간 동안 노출하고, 모든 참가자에게 서버 처리 기준 순위를 반환하는 선착순 동시성 실험 서비스
+매 정각 가장 먼저 등록된 한 문구를 한 시간 동안 노출하고, 첫 등록 후 10초 안의 참가자에게 서버 처리 기준 순위를 반환하는 선착순 동시성 실험 서비스
 ```
 
 ### Topics

@@ -27,6 +27,7 @@
     "winner contract": true,
     "ranked contract": true,
     "winner message persists as text": true,
+    "registration close is capped at slot end": true,
     "invalid slot response": true,
     "future slot response": true,
     "ended slot response": true,

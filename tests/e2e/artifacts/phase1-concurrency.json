@@ -33,7 +33,8 @@
     "one winner": true,
     "positions 1 to 100": true,
     "position contract": true,
-    "winner message immutability": true
+    "winner message immutability": true,
+    "row-lock waiter rejected after registration closes": true
   },
   "slotAt": "2026-09-26T15:00:00.000Z"
 }

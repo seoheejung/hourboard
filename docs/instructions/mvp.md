@@ -424,6 +424,8 @@ endsAt   = 2026-09-26T11:00:00.000Z
 slotAt <= serverTime < slotAt + 1 hour
 ```
 
+첫 정상 등록 전에는 현재 Round의 등록을 허용한다. 첫 등록 시각부터 10초 미만 동안만 후속 등록을 허용한다. 마감 시각은 `min(firstRegisteredAt + 10 seconds, slotAt + 1 hour)`이다. 10초 경계와 row lock 대기 후의 판정은 PostgreSQL UPSERT 안에서 수행한다.
+
 판정:
 
 ```text
@@ -434,7 +436,7 @@ serverTime >= slotAt + 1 hour
 → 409 ROUND_ENDED
 
 slotAt <= serverTime < slotAt + 1 hour
-→ 등록 처리
+→ 첫 등록 또는 10초 Window 안의 등록 처리
 ```
 
 Slot 형식 및 시간 검증은 PostgreSQL write 전에 수행한다.
@@ -481,6 +483,8 @@ Frontend countdown은 응답의 `serverTime`을 기준으로 브라우저 시각
 
 현재 Slot row가 없으면 Winner가 없는 정상 상태로 반환한다.
 
+`currentSlot`에 `registrationOpen`과 `registrationClosesAt`을 포함한다. Winner가 없으면 `registrationOpen = true`, `registrationClosesAt = null`이다. 마감 후에도 Winner 문구는 Slot 종료까지 반환한다.
+
 이전 Slot Winner를 현재 Winner처럼 반환하지 않는다.
 
 ### 13.3 `POST /api/attempts`
@@ -504,7 +508,8 @@ Frontend countdown은 응답의 `serverTime`을 기준으로 브라우저 시각
   "code": "WINNER",
   "message": "가장 먼저 등록하셨습니다. 작성하신 문구를 다음 정각까지 띄워드립니다.",
   "position": 1,
-  "winner": true
+  "winner": true,
+  "registrationClosesAt": "2026-09-26T10:00:10.000Z"
 }
 ```
 
@@ -516,7 +521,8 @@ Frontend countdown은 응답의 `serverTime`을 기준으로 브라우저 시각
   "code": "RANKED",
   "message": "37번째로 등록하셨습니다.",
   "position": 37,
-  "winner": false
+  "winner": false,
+  "registrationClosesAt": "2026-09-26T10:00:10.000Z"
 }
 ```
 
@@ -528,6 +534,7 @@ code
 message
 position
 winner
+registrationClosesAt
 ```
 
 Winner가 아닌 응답에는 다른 사용자의 `winner_message`를 포함하지 않는다.
@@ -557,15 +564,21 @@ position >= 2
 아래 의미를 보존한다.
 
 ```sql
+WITH db_time AS MATERIALIZED (SELECT clock_timestamp() AS at)
 INSERT INTO hour_slots (
     slot_start,
     winner_message,
-    attempt_count
+    attempt_count,
+    created_at
 )
-VALUES ($1, $2, 1)
+SELECT $1, $2, 1, db_time.at
+FROM db_time
+WHERE db_time.at >= $1::timestamptz
+  AND db_time.at < $1::timestamptz + INTERVAL '1 hour'
 ON CONFLICT (slot_start)
 DO UPDATE
 SET attempt_count = hour_slots.attempt_count + 1
+WHERE clock_timestamp() < LEAST(hour_slots.created_at + INTERVAL '10 seconds', hour_slots.slot_start + INTERVAL '1 hour')
 RETURNING
     slot_start,
     winner_message,
@@ -597,6 +610,8 @@ attempt_count >= 2
 
 Winner 문구는 conflict update에서 절대 수정하지 않는다.
 
+마감 뒤의 conflict update는 row를 바꾸지 않고 `409 REGISTRATION_CLOSED`로 처리한다.
+
 애플리케이션 mutex로 순서를 만들지 않는다.
 
 ---
@@ -608,6 +623,7 @@ Winner 문구는 conflict update에서 절대 수정하지 않는다.
 | 400 | `INVALID_REQUEST` | body 형식 또는 message validation 실패 | 입력 확인 안내 |
 | 400 | `INVALID_SLOT` | `slotAt` 형식 오류 또는 정각이 아닌 Slot | Round 정보 재확인 |
 | 409 | `ROUND_ENDED` | 목표 Slot이 이미 종료 | 현재 Round 재조회 |
+| 409 | `REGISTRATION_CLOSED` | 첫 등록 후 10초 Window 종료 | 마감 표시 |
 | 425 | `ROUND_NOT_STARTED` | 목표 Slot이 아직 시작 전 | countdown 유지 |
 | 500 | `INTERNAL_ERROR` | 예측하지 못한 서버 오류 | 결과 미확정 표시 |
 | 503 | `DATABASE_UNAVAILABLE` | PostgreSQL 처리 불가 | 결과 미확정 표시 |
@@ -637,6 +653,9 @@ ROUND_NOT_STARTED
 
 ROUND_ENDED
 → serverTime >= slotAt + 1 hour
+
+REGISTRATION_CLOSED
+→ 첫 등록 후 10초 이상 경과
 
 INTERNAL_ERROR
 → 예측하지 못한 내부 오류
@@ -961,6 +980,7 @@ trim 전/후 규칙 일관성 유지
 공백-only 제출 방지
 줄바꿈 불가
 제출 중 버튼 비활성
+첫 등록 후 10초 경과 시 버튼 비활성
 ```
 
 클라이언트 validation은 UX 목적이다.
@@ -999,6 +1019,7 @@ INVALID_REQUEST
 INVALID_SLOT
 ROUND_NOT_STARTED
 ROUND_ENDED
+REGISTRATION_CLOSED
 INTERNAL_ERROR
 DATABASE_UNAVAILABLE
 ```

@@ -24,7 +24,7 @@ const checks = {};
 const artifact = {
   scenario: 'current-round-browser-registration',
   browser: 'Chrome headless via DevTools Protocol',
-  requested: 3,
+  requested: 4,
   succeeded: 0,
   failed: 0,
   winnerCount: 0,
@@ -136,6 +136,14 @@ try {
   await until(async () => evaluate("document.getElementById('result').dataset.state === 'winner'"));
   check('first registration shows WINNER', await evaluate("document.getElementById('result').textContent.includes('축하합니다!')"));
   check('winner copy says until the next hour', await evaluate("document.getElementById('result').textContent.includes('작성하신 문구를 다음 정각까지 띄워드립니다.')"));
+  const openedRound = await (await fetch(`${base}/api/round`)).json();
+  const firstRow = await pool.query('SELECT created_at FROM hour_slots WHERE slot_start = $1', [slotAt]);
+  const closesAt = openedRound.currentSlot.registrationClosesAt;
+  check('first registration opens ten-second window', openedRound.currentSlot.registrationOpen === true
+    && Number.isFinite(Date.parse(closesAt))
+    && Date.parse(closesAt) === Math.min(firstRow.rows[0].created_at.getTime() + 10_000, Date.parse(openedRound.currentSlot.endsAt)));
+  check('browser displays open window countdown', await evaluate("/^등록 마감까지 [1-9][0-9]?초$/.test(document.getElementById('round-status').textContent)"));
+  artifact.registrationClosesAt = closesAt;
 
   check('valid message enables button with winner', !(await type('browser-second')));
   await evaluate("document.getElementById('submit-button').click()");
@@ -167,7 +175,9 @@ try {
   const timing = await evaluate(`(() => {
     const originalTarget = targetSlotAt;
     const originalOffset = serverOffsetMs;
+    const originalClose = registrationClosesAt;
     const button = document.getElementById('submit-button');
+    registrationClosesAt = null;
     targetSlotAt = new Date(serverNow() + 60_000).toISOString();
     tick();
     const beforeStartDisabled = button.disabled;
@@ -179,11 +189,26 @@ try {
     const afterEndDisabled = button.disabled;
     targetSlotAt = originalTarget;
     serverOffsetMs = originalOffset;
+    registrationClosesAt = originalClose;
     tick();
     return { beforeStartDisabled, atStartEnabled, afterEndDisabled };
   })()`);
   check('slot clock gates registration in browser', timing.beforeStartDisabled && timing.atStartEnabled && timing.afterEndDisabled);
   artifact.clockCheck = 'Browser clock offset simulated; actual hour boundary was not awaited';
+
+  await until(async () => evaluate("document.getElementById('submit-button').disabled && document.getElementById('round-status').textContent === '이번 라운드의 등록이 마감되었습니다.'"), 160);
+  check('button disables after real ten-second window', await evaluate('serverNow() >= Date.parse(registrationClosesAt)'));
+  const lateResponse = await fetch(`${base}/api/attempts`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ slotAt, message: 'browser-late' })
+  });
+  const late = await lateResponse.json();
+  check('direct API attempt is rejected after close', lateResponse.status === 409
+    && late.code === 'REGISTRATION_CLOSED' && late.message === '이번 Round의 등록이 마감되었습니다.'
+    && late.position === null && late.winner === false);
+  const closedRound = await (await fetch(`${base}/api/round`)).json();
+  check('winner stays visible after registration closes', closedRound.currentSlot.registrationOpen === false
+    && closedRound.currentSlot.message === 'browser-first');
 
   const layout = await evaluate(`(() => {
     const title = document.querySelector('h1');
@@ -207,6 +232,33 @@ try {
   artifact.missingPositions = artifact.succeeded === 3 ? 0 : 3 - artifact.succeeded;
   artifact.winnerMessageMutations = after.currentSlot.message === 'browser-first' ? 0 : 1;
   check('database winner and positions remain consistent', artifact.succeeded === 3 && artifact.winnerCount === 1 && artifact.winnerMessageMutations === 0);
+  await pool.query('TRUNCATE hour_slots');
+  await pool.query('INSERT INTO hour_slots (slot_start, winner_message) VALUES ($1, $2)', [new Date(Date.parse(slotAt) - 3_600_000), 'previous-round-winner']);
+  const freshRound = await (await fetch(`${base}/api/round`)).json();
+  check('new round with only previous winner is open', freshRound.currentSlot.message === null
+    && freshRound.currentSlot.registrationOpen === true && freshRound.currentSlot.registrationClosesAt === null);
+  const freshResponse = await fetch(`${base}/api/attempts`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ slotAt, message: 'next-round-first' })
+  });
+  const fresh = await freshResponse.json();
+  check('new round accepts a fresh winner', freshResponse.status === 200
+    && fresh.code === 'WINNER' && fresh.position === 1 && fresh.winner === true);
+  artifact.previousRoundFixture = { requested: 1, succeeded: 1, winnerCount: 1, position: 1 };
+  const nextRoundUi = await evaluate(`(() => {
+    const start = Date.parse(round.nextSlotAt);
+    serverOffsetMs = start - Date.now();
+    applyRound({
+      serverTime: new Date(start).toISOString(),
+      currentSlot: { startsAt: new Date(start).toISOString(), endsAt: new Date(start + 3_600_000).toISOString(),
+        message: null, attemptCount: null, registrationOpen: true, registrationClosesAt: null },
+      nextSlotAt: new Date(start + 3_600_000).toISOString()
+    });
+    return { enabled: !document.getElementById('submit-button').disabled,
+      closeCleared: registrationClosesAt === null, newTarget: targetSlotAt === new Date(start).toISOString() };
+  })()`);
+  check('next round clears close state in browser', nextRoundUi.enabled && nextRoundUi.closeCleared && nextRoundUi.newTarget);
+  artifact.clockCheck = 'Actual ten-second window awaited; hour transition simulated in browser and prior-round DB fixture';
   console.log('Browser registration E2E passed');
 } catch (error) {
   artifact.error = error instanceof Error ? error.message : String(error);

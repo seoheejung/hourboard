@@ -29,8 +29,19 @@ export function registerAttempts(app: FastifyInstance, pool: pg.Pool) {
         return apiError('ROUND_ENDED', '이미 종료된 Round입니다.');
       }
       try {
-        const position = await registerAttempt(pool, slot, message);
+        const attempt = await registerAttempt(pool, slot, message);
+        if (!attempt) {
+          const currentTime = Date.now();
+          if (currentTime >= nextSlot(slot).getTime()) {
+            reply.code(409);
+            return apiError('ROUND_ENDED', '이미 종료된 Round입니다.');
+          }
+          reply.code(409);
+          return apiError('REGISTRATION_CLOSED', '이번 Round의 등록이 마감되었습니다.');
+        }
+        const position = attempt.position;
         const winner = position === 1;
+        const registrationClosesAt = new Date(Math.min(attempt.firstRegisteredAt.getTime() + 10_000, nextSlot(slot).getTime()));
         return {
           slotAt: slot.toISOString(),
           code: winner ? 'WINNER' : 'RANKED',
@@ -38,7 +49,8 @@ export function registerAttempts(app: FastifyInstance, pool: pg.Pool) {
             ? '가장 먼저 등록하셨습니다. 작성하신 문구를 다음 정각까지 띄워드립니다.'
             : `${position}번째로 등록하셨습니다.`,
           position,
-          winner
+          winner,
+          registrationClosesAt: registrationClosesAt.toISOString()
         };
       } catch {
         reply.code(503);

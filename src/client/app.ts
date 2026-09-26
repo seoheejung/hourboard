@@ -1,6 +1,6 @@
 type RoundResponse = {
   serverTime: string;
-  currentSlot: { startsAt: string; endsAt: string; message: string | null; attemptCount: number | null };
+  currentSlot: { startsAt: string; endsAt: string; message: string | null; attemptCount: number | null; registrationOpen: boolean; registrationClosesAt: string | null };
   nextSlotAt: string;
 };
 
@@ -10,6 +10,7 @@ type AttemptResponse = {
   position: number | null;
   winner: boolean;
   slotAt?: string;
+  registrationClosesAt?: string;
 };
 
 function element<T extends HTMLElement>(id: string): T {
@@ -33,6 +34,7 @@ const HOUR_MS = 3_600_000;
 let serverOffsetMs = 0;
 let round: RoundResponse | null = null;
 let targetSlotAt: string | null = null;
+let registrationClosesAt: string | null = null;
 let localWinner: { slotAt: string; message: string } | null = null;
 let pending = false;
 let syncInFlight = false;
@@ -46,10 +48,11 @@ function validMessage() {
   return value.trim().length > 0 && Array.from(value).length <= 120 && !/[\r\n\u2028\u2029]/u.test(value);
 }
 function canSubmit() {
-  if (!targetSlotAt || pending || !validMessage()) return false;
+  if (!targetSlotAt || round?.currentSlot.registrationOpen === false || pending || !validMessage()) return false;
   const now = serverNow();
   const start = Date.parse(targetSlotAt);
-  return now >= start && now < start + HOUR_MS;
+  return now >= start && now < start + HOUR_MS
+    && (!registrationClosesAt || now < Date.parse(registrationClosesAt));
 }
 
 function formatTime(value: string) {
@@ -101,10 +104,12 @@ function applyRound(next: RoundResponse) {
   round = next;
   if (previousSlot && previousSlot !== next.currentSlot.startsAt) {
     localWinner = null;
+    registrationClosesAt = null;
     result.replaceChildren();
     delete result.dataset.state;
   }
   targetSlotAt = next.currentSlot.startsAt;
+  registrationClosesAt = next.currentSlot.registrationClosesAt ?? registrationClosesAt;
   if (localWinner?.slotAt !== next.currentSlot.startsAt) localWinner = null;
   boardHeading.textContent = `${formatHour(next.currentSlot.startsAt)}시 전광판`;
   showBoardMessage(next.currentSlot.message ?? localWinner?.message ?? '아직 등록된 문구가 없습니다.');
@@ -121,7 +126,11 @@ async function syncRound() {
     const response = await fetch('/api/round', { cache: 'no-store' });
     if (!response.ok) throw new Error('Round unavailable');
     const data = await response.json() as RoundResponse;
-    if (!data.currentSlot || !data.serverTime || !data.nextSlotAt) throw new Error('Invalid round response');
+    if (!data.currentSlot || !data.serverTime || !data.nextSlotAt
+      || typeof data.currentSlot.registrationOpen !== 'boolean'
+      || (data.currentSlot.registrationClosesAt !== null && !Number.isFinite(Date.parse(data.currentSlot.registrationClosesAt)))) {
+      throw new Error('Invalid round response');
+    }
     serverOffsetMs = Date.parse(data.serverTime) - (sentAt + Date.now()) / 2;
     roundError = false;
     applyRound(data);
@@ -152,6 +161,8 @@ function tick() {
   else if (roundError) roundStatus.textContent = '전광판 갱신이 지연되고 있습니다.';
   else if (targetSlotAt && serverNow() < Date.parse(targetSlotAt)) roundStatus.textContent = '문구를 미리 입력하고 다음 정각에 등록해 주세요.';
   else if (targetSlotAt && serverNow() >= Date.parse(targetSlotAt) + HOUR_MS) roundStatus.textContent = '새 라운드를 확인하는 중입니다.';
+  else if (round.currentSlot.registrationOpen === false || (registrationClosesAt && serverNow() >= Date.parse(registrationClosesAt))) roundStatus.textContent = '이번 라운드의 등록이 마감되었습니다.';
+  else if (registrationClosesAt) roundStatus.textContent = `등록 마감까지 ${Math.ceil((Date.parse(registrationClosesAt) - serverNow()) / 1000)}초`;
   else roundStatus.textContent = '현재 라운드에 등록할 수 있습니다.';
   submitButton.disabled = !canSubmit();
   submitButton.textContent = pending ? '등록 중…' : '등록하기';
@@ -182,10 +193,12 @@ form.addEventListener('submit', async event => {
     });
     const data = await response.json() as AttemptResponse;
     if (response.ok && data.slotAt === slotAt && data.code === 'WINNER' && data.position === 1 && data.winner === true) {
+      if (round?.currentSlot.startsAt === slotAt && data.registrationClosesAt) registrationClosesAt = data.registrationClosesAt;
       showResult('winner', '축하합니다!', data.message);
       localWinner = { slotAt, message };
       if (round?.currentSlot.startsAt === slotAt) showBoardMessage(message);
     } else if (response.ok && data.slotAt === slotAt && data.code === 'RANKED' && Number.isInteger(data.position) && data.position! >= 2 && data.winner === false) {
+      if (round?.currentSlot.startsAt === slotAt && data.registrationClosesAt) registrationClosesAt = data.registrationClosesAt;
       showResult('ranked', '아쉽군요!', data.message);
       void syncRound();
     } else if (!response.ok && data.code === 'INVALID_REQUEST') {
@@ -197,6 +210,10 @@ form.addEventListener('submit', async event => {
       showResult('error', '아직 시작 전입니다.', '다음 정각에 다시 등록해 주세요.');
     } else if (!response.ok && data.code === 'ROUND_ENDED') {
       showResult('error', '이미 종료된 라운드입니다.', '현재 라운드 정보를 다시 불러옵니다.');
+      void syncRound();
+    } else if (!response.ok && data.code === 'REGISTRATION_CLOSED') {
+      if (round?.currentSlot.startsAt === slotAt) registrationClosesAt = new Date(serverNow()).toISOString();
+      showResult('error', '등록이 마감되었습니다.', data.message);
       void syncRound();
     } else {
       showResult('error', '등록 결과를 확인하지 못했습니다.', '다시 등록하면 새로운 도전으로 처리됩니다.');

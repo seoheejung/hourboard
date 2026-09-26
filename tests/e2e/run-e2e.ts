@@ -129,6 +129,30 @@ try {
     ? result.body.code === 'WINNER' && result.body.winner === true
     : result.body.code === 'RANKED' && result.body.winner === false));
   check('winner message immutability', artifact.winnerMessageMutations === 0);
+  await pool.query('TRUNCATE hour_slots');
+  await pool.query(`INSERT INTO hour_slots (slot_start, winner_message, created_at)
+    VALUES ($1, $2, clock_timestamp() - INTERVAL '9 seconds')`, [slotAt, 'locked winner']);
+  const lock = await pool.connect();
+  let transactionOpen = false;
+  try {
+    await lock.query('BEGIN');
+    transactionOpen = true;
+    await lock.query('SELECT 1 FROM hour_slots WHERE slot_start = $1 FOR UPDATE', [slotAt]);
+    const waitingAttempt = request(slotAt, 'waiting behind row lock');
+    await new Promise(resolve => setTimeout(resolve, 1_500));
+    await lock.query('COMMIT');
+    transactionOpen = false;
+    const late = await waitingAttempt;
+    const lockedRow = await pool.query<{ attempt_count: string; winner_message: string }>(
+      'SELECT attempt_count, winner_message FROM hour_slots WHERE slot_start = $1', [slotAt]
+    );
+    check('row-lock waiter rejected after registration closes', late.status === 409
+      && late.body.code === 'REGISTRATION_CLOSED' && late.body.position === null
+      && lockedRow.rows[0]?.attempt_count === '1' && lockedRow.rows[0]?.winner_message === 'locked winner');
+  } finally {
+    if (transactionOpen) await lock.query('ROLLBACK');
+    lock.release();
+  }
   console.log('Phase 1 E2E passed');
 } catch (error) {
   artifact.error = error instanceof Error ? error.message : String(error);
