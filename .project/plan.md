@@ -144,13 +144,20 @@ flowchart LR
 
 ### 목표 슬롯 검증
 
-클라이언트는 등록 요청에 `targetSlotAt`을 포함한다.
+클라이언트는 등록 요청에 `slotAt`을 포함한다.
 
-서버는 현재 시각에서 활성 슬롯을 계산하고 요청의 `targetSlotAt`과 비교한다.
+서버는 자신의 시스템 시간을 기준으로 요청의 `slotAt` 형식과 현재 Round 여부를 검증한다.
 
-- 목표 슬롯이 아직 시작 전: `425 TOO_EARLY`
-- 목표 슬롯이 이미 종료: `409 ROUND_EXPIRED`
-- 목표 슬롯이 현재 활성 슬롯: 등록 처리
+- `slotAt` 형식 오류 또는 정각이 아님: `400 INVALID_SLOT`
+- 목표 Slot이 아직 시작 전: `425 ROUND_NOT_STARTED`
+- 목표 Slot이 이미 종료: `409 ROUND_ENDED`
+- 목표 Slot이 현재 활성 Slot: 등록 처리
+
+등록 가능한 시간 범위:
+
+```text
+slotAt <= serverTime < slotAt + 1 hour
+```
 
 이 검증은 DB 접근 전에 수행한다.
 
@@ -470,15 +477,19 @@ hourboard/
 - 등록 버튼 상태 처리
 - 1등 결과 UI
 - N등 결과 UI
+- `INVALID_SLOT` 오류 UI
+- `ROUND_NOT_STARTED` 오류 UI
+- `ROUND_ENDED` 오류 UI
 - 모바일 대응
 - 접근성 상태 알림
 
 완료 기준:
 
 - 다음 슬롯 시작 전/후 UI 상태 전환 정상
-- `TOO_EARLY`, `ROUND_EXPIRED` 처리 정상
-- 등록 결과가 position과 일치
-- 현재 승자 문구가 다음 정각 전까지 유지
+- `INVALID_SLOT`, `ROUND_NOT_STARTED`, `ROUND_ENDED` 처리 정상
+- `WINNER`, `RANKED` 결과가 `position`과 일치
+- 현재 Winner 문구가 해당 Round 종료 전까지 유지
+- 새로운 Round가 시작되면 이전 Winner 문구를 현재 전광판에 표시하지 않음
 
 ### Phase 3 — Load & Race Verification
 

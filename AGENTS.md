@@ -35,8 +35,6 @@ AGENTS.md
 ↓
 .project/plan.md
 ↓
-docs/instructions/지시서
-↓
 DESIGN.md
 ↓
 README.md
