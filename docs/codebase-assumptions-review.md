@@ -1,6 +1,6 @@
 # 코드베이스 가정 검토 목록
 
-**상태: 검토 완료 / Phase 4 검증 기준 확정.** 이 문서는 현재 Phase 3 구현과 Phase 4 준비를 판단할 때 사용한 가정을 기록한다. 아래 수정안은 제안일 뿐이며 적용하지 않았다. 항목 번호는 첫 검토 목록과의 대조를 위해 유지했다.
+**상태: 검토 완료 / Phase 4 초기 검증 기준.** 이 문서의 표는 Phase 4 시작 전 검토 당시의 구현과 가정을 기록한다. 항목 번호는 첫 검토 목록과의 대조를 위해 유지했다. 이후 확인되거나 수정된 내용은 아래 **Phase 4 진행 업데이트**와 [진행 기록](progress/phase4-oci-deployment.md)을 우선한다.
 
 - **검증됨**: 실제 저장소 코드를 읽어 구현을 확인했다. 운영 환경에서도 같은 결과가 나온다는 뜻은 아니다.
 - **추측됨**: 코드나 로컬 측정만으로 확인할 수 없는 전제다. 추측 이유와 가장 좁은 확인·수정 방법을 함께 적었다.
@@ -43,6 +43,17 @@
 | 28 | 현재 오류 기록만으로 운영 장애 원인을 진단할 수 있을지는 미확인이다. Fastify logger가 꺼져 있고 일부 catch가 원인을 응답에서 숨긴다. [src/server.ts](../src/server.ts) | Phase 4 배포 전에 production에서만 최소 구조화 오류 로그를 검토한다. 시각·route·HTTP 상태·내부 오류 범주·존재한다면 요청 상관관계 ID만 기록한다. `DATABASE_URL`, 비밀번호, 환경 변수 전체, 사용자 문구 전문은 기록하지 않고 stack trace는 외부 응답에 노출하지 않는다. |
 | 29 | OCI VM의 Linux 배포판과 HTTPS 종료·인증서 구성이 아직 확정되지 않았다. Phase 4 지침에는 안정 Linux image와 reverse proxy 방향이 있지만 VM image 및 Caddy/Nginx 등 구현체는 선택되지 않았다. [Phase 4 지침](instructions/phase4-oci-deployment.md) 외부 HTTPS를 위해 reverse proxy가 필요하다는 전제도 실제 구성 선택 전에는 운영 설계로 다뤄야 한다. | Phase 4 시작 시 VM image를 정하고 Node.js·PostgreSQL 설치 가능성을 확인한 다음 HTTPS 방식을 확정한다. reverse proxy를 채택하는 경우에만 Fastify loopback bind를 유지하고 proxy만 외부에 노출한다. 그 선택에 맞춰 systemd와 firewall을 구성한다. |
 
+## Phase 4 진행 업데이트 — 2026-09-28
+
+이 섹션은 초기 검토 표의 이후 상태다. OCI 내용은 사용자 수동 확인 결과이며, 상세 구성과 오류는 [Phase 4 진행 기록](progress/phase4-oci-deployment.md)에 둔다.
+
+- **#13:** 원격 Winner를 10초 동기화만으로 늦게 반영하는 현상을 실제 브라우저에서 재현했다. 등록 가능 상태에서 `/api/open-state`를 조회하는 최소 수정 후 실제 브라우저에서 Winner와 Window 마감을 확인했다. 현재 UI는 `/api/open-state`를 호출하므로 초기 표의 구현 설명은 과거 상태다.
+- **#19:** 실제 정각 DB 대기에서 `/api/round`가 이전 Slot을 반환하는 오류를 재현하고, 응답 전 Slot 재계산·변경 시 1회 재조회를 적용했다. 수정 후 build와 기존 E2E는 통과했다. **수정 후 실제 정각 경계 E2E는 아직 수행하지 않았다.** 초기 표의 코드 설명은 과거 상태다.
+- **#20:** 10초 Window와 정각에서 PostgreSQL 잠금 대기 후 최종 거부를 확인했다. DB의 `clock_timestamp()` 판정과 atomic UPSERT는 변경하지 않았다.
+- **#22:** 계정은 Free Trial이고 홈 리전은 Japan East (Tokyo), `ap-tokyo-1`이다. 사용자 수동 확인에서 A1 OCPU·memory limit/available은 `Dynamic`, 각각 usage는 `0`이었고 `VM.Standard.A1.Flex`에 `Always Free-eligible` 표시가 있었다. SSH public key는 Compute 구성에 등록됐다. private key의 실제 로컬 보관은 미확인이다. 현재 차단 원인은 무료 자격 미확인이 아니라 `AP-TOKYO-1-AD-1`의 A1 host capacity 부족이다.
+- **#23·#29:** Canonical Ubuntu 24.04 Minimal aarch64 이미지를 선택했다. VM은 생성되지 않아 해당 환경의 Node.js·PostgreSQL 설치 가능성과 HTTPS 종료 방식은 여전히 미검증이다.
+- **#24·#25:** 도메인·DNS 제어는 미확인이다. VCN·subnet·gateway·Route Table·Security List는 생성됐지만 VM 생성 후 외부 포트와 Security List 최종 검증이 남았다.
+
 ## 로컬 작업공간 상태 — 코드 동작 가정 아님
 
 - 이전 미완료 Phase 3 실행 폴더 5개는 로컬에 남아 있고 `.gitignore`의 `k6/results/` 규칙으로 Git 추적 대상에서 제외된다. 이 폴더는 기준 baseline에 포함되지 않는다.
@@ -65,4 +76,4 @@
 
 ## 검토 범위
 
-이 목록은 현재 판단과 Phase 4 준비에 실제로 사용한 가정이다. 검증된 구현 사실은 근거 없이 바꾸지 않고, 추측된 운영 동작은 Phase 4에서 확인한 뒤 필요한 최소 수정만 검토한다. 제안된 수정은 수동 검토 전까지 적용하지 않는다.
+이 목록은 Phase 4 준비에 사용한 초기 가정과 그 뒤의 검증 결과다. 검증된 구현 사실은 근거 없이 바꾸지 않고, 미검증 운영 동작은 실제 환경에서 확인한 뒤 필요한 최소 수정만 검토한다. Phase 4 완료 여부는 이 문서만으로 판단하지 않는다.

@@ -1,22 +1,80 @@
 {
-  "scope": "Read-only OCI preflight; no resources created",
-  "accountAccess": "signed in to OCI Console",
-  "accountStatus": "Free Trial",
-  "homeRegionShownByConsole": "NRT",
-  "activeRegionShownByConsole": "Japan East (Tokyo)",
-  "regionIdentifierShownByConsoleUrl": "ap-tokyo-1",
-  "freeEligibilityForProposedCompute": "not verified for this account",
-  "remainingFreeOcpuQuota": null,
-  "remainingFreeMemoryQuota": null,
-  "remainingFreeBootVolumeQuota": null,
-  "proposedShape": null,
-  "proposedOcpu": null,
-  "proposedMemoryGb": null,
-  "creationEstimatedCost": null,
-  "sshAccessReady": "not verified",
-  "domainReady": "not verified",
-  "dnsControl": "not verified",
-  "consoleAutomationLimit": "Quota filter controls were inside a frame unavailable to the browser accessibility tree; coordinate click was rejected by automatic approval review.",
-  "officialReference": "https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm",
-  "resourceCreation": "none by this agent during preflight"
+  "status": "blocked at Compute launch by Tokyo A1 host capacity",
+  "source": "User-reported manual OCI Console checks and resource operations, 2026-09-28",
+  "account": {
+    "type": "Free Trial",
+    "homeRegion": "Japan East (Tokyo)",
+    "regionIdentifier": "ap-tokyo-1",
+    "availabilityDomain": "AP-TOKYO-1-AD-1"
+  },
+  "a1Quota": {
+    "standard-a1-core-count": { "limit": "Dynamic", "usage": 0, "available": "Dynamic" },
+    "standard-a1-memory-count": { "limit": "Dynamic", "usage": 0, "available": "Dynamic" }
+  },
+  "computeSelection": {
+    "shape": "VM.Standard.A1.Flex",
+    "consoleAlwaysFreeEligible": true,
+    "ocpu": 1,
+    "memoryGb": 6,
+    "image": "Canonical Ubuntu 24.04 Minimal aarch64",
+    "imageMarkedFree": true,
+    "bootVolumeGbApprox": 46.6,
+    "additionalBlockVolume": false,
+    "publicIpv4Configured": true,
+    "estimatedCostFieldPresent": false,
+    "estimatedCostUsd": null,
+    "costFieldAbsenceIsCurrentBlocker": false
+  },
+  "existingNetwork": {
+    "vcn": "hourboard-vcn",
+    "vcnCidr": "10.0.0.0/16",
+    "publicSubnetCidr": "10.0.0.0/24",
+    "privateSubnetCidr": "10.0.1.0/24",
+    "internetGatewayCreated": true,
+    "natGatewayCreated": true,
+    "serviceGatewayCreated": true,
+    "routeTablesCreated": true,
+    "securityListsCreated": true,
+    "securityListsFinalVerification": "pending after VM launch"
+  },
+  "ssh": {
+    "publicKeyRegisteredInComputeConfiguration": true,
+    "privateKeyLocalStorageVerified": false,
+    "privateKeyContentsRecorded": false
+  },
+  "directComputeLaunch": {
+    "created": false,
+    "error": "Out of capacity for shape VM.Standard.A1.Flex in availability domain AD-1",
+    "repeatedRequestError": "Too many requests for the user"
+  },
+  "resourceManager": {
+    "stack": "instance-hourboard",
+    "status": "Active",
+    "terraformVersion": "1.5.x",
+    "usesExistingVcnAndPublicSubnet": true,
+    "plan": { "succeeded": true, "toAdd": 1, "toChange": 0, "toDestroy": 0 },
+    "apply": {
+      "succeeded": false,
+      "service": "Core Instance",
+      "operation": "LaunchInstance",
+      "error": "500 InternalError: Out of host capacity"
+    }
+  },
+  "computeInstanceCreated": false,
+  "resourcesCreatedByThisAgent": "none",
+  "currentBlocker": "VM.Standard.A1.Flex host capacity in Tokyo AP-TOKYO-1-AD-1",
+  "remainingChecks": [
+    "post-fix actual-hour /api/round boundary E2E",
+    "domain ownership and DNS control",
+    "local SSH private key availability without reading its contents",
+    "final Security List and external port verification after VM launch",
+    "OS, Node.js, PostgreSQL, migration, systemd, HTTPS",
+    "external E2E, reboot recovery, external latency"
+  ],
+  "nextCapacityAttempt": [
+    "Keep the existing network and instance-hourboard stack",
+    "Run Resource Manager Plan and confirm 1 to add, 0 to change, 0 to destroy",
+    "Run Apply once when A1 capacity is available"
+  ],
+  "officialReference": "https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm"
 }

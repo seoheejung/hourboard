@@ -96,7 +96,7 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 | Backend | Fastify 5.x | 낮은 오버헤드, JSON Schema 기반 검증 |
 | Database | PostgreSQL 18.x | UPSERT, row locking, MVCC 기반 동시성 검증 |
 | Infrastructure | OCI Compute Always Free | 단일 Linux VM |
-| Region | OCI Seoul | OCI home region이 서울인 계정 기준 |
+| Region | OCI Japan East (Tokyo) | 현재 계정 home region `ap-tokyo-1` 기준 |
 | Load Test | k6 | Registration Race, polling, Thundering Herd 및 latency 측정 |
 | Process | systemd | API 프로세스 상시 실행 |
 
@@ -112,14 +112,14 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 ## 6. 인프라 구조
 ```mermaid
 flowchart LR
-    U[Browser] -->|HTTPS| A[Fastify API\nOCI Seoul VM]
+    U[Browser] -->|HTTPS| A[Fastify API\nOCI Tokyo VM]
     K[k6] -->|Load Test| A
     A -->|localhost:5432| P[(PostgreSQL)]
 ```
 ### 배치 원칙
 
 - OCI Always Free Compute는 계정 home region에서 생성
-- 서울 배포는 OCI home region이 Seoul인 계정 기준
+- 이번 배포는 현재 계정 home region인 Japan East (Tokyo) 기준
 - Phase 4 시작 시 OCI 공식 문서에서 현재 Always Free Compute 조건과 제공 shape를 다시 확인하고 무료 범위 안에서 단일 VM을 선택
 - Always Free capacity 확보 실패 시 임의의 유료 shape로 변경 금지
 - API와 PostgreSQL을 동일 VM에 배치
@@ -492,13 +492,14 @@ Phase 3 로컬 baseline을 수정하지 않고 비교 기준으로 사용한다.
 OCI 계정 생성은 완료되었으며 Home Region은 **Japan East (Tokyo)**, Region identifier는 **`ap-tokyo-1`**이다.
 
 세부 구현 기준은 `docs/instructions/phase4-oci-deployment.md`를 따른다.
+현재 수동 확인·capacity blocker·남은 검증은 [Phase 4 진행 기록](../docs/progress/phase4-oci-deployment.md)에 별도로 기록한다. Phase 4 완료 상태로 이동하지 않는다.
 
 범위:
 
 - OCI account 및 Home Region `Japan East (Tokyo)` 확인
 - Phase 4 시작 시 OCI Console과 공식 문서에서 현재 Always Free 조건 재확인
 - 현재 계정에서 Tokyo Region의 무료 Compute eligibility 및 잔여 quota 확인
-- 생성하려는 Compute의 예상 비용이 0이고 무료 대상임이 명확하게 확인되는 경우에만 Tokyo VM 생성
+- Tokyo Compute 생성 전 실제 계정의 quota·usage, `Always Free-eligible` 표시, 선택한 OCPU·memory·image·volume 구성을 대조한다. Console에 예상 비용이 표시되면 0인지 확인하고, 필드가 없는 것만으로 blocker로 보지 않는다. 무료 여부가 불명확하거나 표시된 비용이 0이 아니면 생성하지 않는다.
 - 무료 조건이 불명확하거나 capacity가 없으면 다른 Region 또는 유료 resource로 임의 전환하지 않음
 - VM image 및 architecture 확인
 - Node.js 24 LTS 설치

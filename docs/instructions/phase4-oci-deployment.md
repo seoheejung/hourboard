@@ -4,7 +4,9 @@
 
 >
 
-> 목표: Phase 1~3이 완료된 HourBoard를 OCI Seoul Always Free Compute에 배포하고, Node.js + PostgreSQL을 동일 VM에서 운영하며 HTTPS, systemd 자동 복구, PostgreSQL localhost 제한, 외부 E2E와 실제 외부 latency를 검증한다.
+> 목표: Phase 1~3이 완료된 HourBoard를 OCI Japan East (Tokyo) Always Free Compute에 배포하고, Node.js + PostgreSQL을 동일 VM에서 운영하며 HTTPS, systemd 자동 복구, PostgreSQL localhost 제한, 외부 E2E와 실제 외부 latency를 검증한다.
+
+현재 계정의 생성된 네트워크·Stack과 capacity blocker는 [Phase 4 진행 기록](../progress/phase4-oci-deployment.md)을 먼저 확인한다. 진행 기록의 항목을 다시 생성하거나 완료로 간주하지 않는다.
 
 ---
 
@@ -169,7 +171,7 @@ Phase 4는 실제 OCI 리소스를 다루므로 아래 조건을 먼저 확인�
 ```text
 OCI 계정 존재
 OCI home region 확인
-home region = Seoul
+home region = Japan East (Tokyo), region identifier = ap-tokyo-1
 현재 계정에서 Always Free eligible Compute 사용 가능 여부 확인
 현재 계정의 실제 무료 quota 확인
 SSH key 준비
@@ -191,7 +193,7 @@ DNS 변경 권한 보유
 
 현재 계정에서 무료임이 명확하게 확인되는 범위 안에서만 구성한다.
 
-home region이 Seoul이 아니거나 Seoul에서 현재 Phase의 무료 Compute 조건을 충족할 수 없으면 다른 region 또는 유료 리소스로 임의 변경하지 않고 blocker로 기록한다.
+home region이 Tokyo가 아니거나 Tokyo에서 현재 Phase의 무료 Compute 조건을 충족할 수 없으면 다른 region 또는 유료 리소스로 임의 변경하지 않고 blocker로 기록한다.
 
 ### Compute 구성
 
@@ -210,7 +212,7 @@ A1을 사용할 수 있다면 실제 Console에서 무료로 확인되는 OCPU /
 ### 승인
 
 - OCI에서 현재 계정 기준 Always Free eligible로 확인된 Compute 1대 생성
-- Seoul home region 내 VCN/subnet/security rule 구성
+- Tokyo home region 내 VCN/subnet/security rule 구성
 - 무료 범위의 public IPv4 할당
 - SSH 접속
 - 프로젝트와 호환되는 안정 Linux image 선택
@@ -280,29 +282,26 @@ A1 무료 quota 초과
 
 무료인지 추측하지 않는다.
 
+OCI Console에 예상 비용 필드가 없는 경우에는 그 부재만으로 blocker로 보지 않는다. 현재 계정의 quota·usage, 선택한 Shape의 `Always Free-eligible` 표시, OCPU·memory·image·boot/additional volume 구성을 확인한다. 예상 비용이 표시되며 0이 아니거나 무료 대상 여부가 불명확하면 생성을 중단한다.
+
 실제 billing/eligibility를 확인할 수 없는 환경에서는 인프라 생성 단계를 완료했다고 기록하지 않는다.
 
 ---
 
 ## 4. Capacity 실패 처리
 
-OCI Always Free는 capacity 부족으로 instance 생성이 실패할 수 있다.
+현재 계정은 Tokyo `AP-TOKYO-1-AD-1`에서 `VM.Standard.A1.Flex` 직접 생성과 Resource Manager Apply가 모두 `Out of host capacity`로 실패했다. 기존 네트워크와 `instance-hourboard` Stack은 유지한다.
 
-`Out of host capacity` 또는 이에 준하는 오류가 발생하면:
+capacity 확보 후 재시도 순서:
 
 ```text
-
-1. 같은 home region 내 허용 가능한 availability domain 재시도
-
-2. 무료 범위를 넘는 shape으로 변경하지 않음
-
-3. 유료 계정 업그레이드를 자동 수행하지 않음
-
-4. 반복 실패 시 blocker 기록
-
+1. Resource Manager의 instance-hourboard Stack에서 Plan 실행
+2. 1 to add, 0 to change, 0 to destroy 확인
+3. Apply 1회 실행
+4. capacity 부족 또는 요청 제한이 다시 발생하면 오류를 기록하고 중단
 ```
 
-무료 capacity 부족을 코드 오류로 기록하지 않는다.
+기존 VCN·subnet·gateway·Route Table·Security List·Stack을 삭제하거나 재생성하지 않는다. Availability Domain, Region, Shape 또는 계정 유형을 임의로 변경하지 않는다. 무료 capacity 부족을 코드 오류로 기록하지 않는다.
 
 ---
 
@@ -909,7 +908,7 @@ VM terminate/recreate까지의 disaster recovery는 현재 Phase 범위가 아�
 
 ```text
 측정 위치: 사용자 로컬 네트워크
-대상: OCI Seoul
+대상: OCI Japan East (Tokyo)
 프로토콜: HTTPS
 측정 시각: ...
 sample 수: ...
@@ -1215,7 +1214,7 @@ Phase 4가 blocker로 부분 완료된 경우 README에 완료라고 쓰지 않�
 [ ] Local Gate #20 사전/최종 판정 경계 검증
 [ ] 필요한 경우 최소 수정 후 build / E2E 통과
 
-[ ] OCI home region = Seoul 확인
+[ ] OCI home region = Japan East (Tokyo) 확인
 [ ] 현재 계정의 Free eligibility / quota 확인
 [ ] 유료 resource 생성 없음
 [ ] OCI Compute 생성
@@ -1286,7 +1285,7 @@ domain, OCI 인증, Free eligibility 등 필수 전제가 충족되지 않으면
 
 ```text
 Local Gate에서 핵심 UI/정각 경계 오류가 재현됐지만 수정·재검증하지 못함
-OCI home region이 Seoul이 아님
+OCI home region이 Tokyo가 아님
 현재 계정의 Free eligibility 확인 불가
 무료 capacity 없음
 OCI 인증 정보 없음
@@ -1467,7 +1466,7 @@ Pager/alerting
 
 그 다음 OCI 계정의 home region, 현재 계정에서 실제로 확인되는 Free eligibility / quota, SSH, domain/DNS 조건을 확인한다. 문서에 적힌 과거 무료 사양 숫자만 근거로 리소스를 생성하지 않는다.
 
-무료 조건이 확인되는 경우에만 Seoul Compute 1대를 생성한다.
+무료 조건이 확인되는 경우에만 Tokyo Compute 1대를 생성한다.
 
 VM image를 확정한 뒤 해당 architecture에서 Node.js 24 LTS와 PostgreSQL 18 설치·빌드·migration을 smoke 확인하고 HTTPS 종료 방식을 결정한다. reverse proxy를 채택하는 경우 Fastify는 loopback bind를 유지하고 proxy만 외부에 노출한다.
 
