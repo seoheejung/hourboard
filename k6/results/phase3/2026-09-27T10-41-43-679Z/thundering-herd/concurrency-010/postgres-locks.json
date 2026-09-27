@@ -1,0 +1,594 @@
+{
+  "samplingIntervalMs": 75,
+  "sampleCount": 65,
+  "maxActiveConnections": 0,
+  "maxLockWaitingConnections": 0,
+  "maxUngrantedLocks": 0,
+  "samples": [
+    {
+      "at": "2026-09-27T11:02:13.019Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.107Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.185Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.262Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.338Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.416Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.495Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.573Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.650Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.732Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.808Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.886Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:13.964Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.043Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.120Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.200Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.276Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.354Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.433Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.509Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.586Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.664Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.740Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.819Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.899Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:14.974Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.052Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.129Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.208Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.284Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.361Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.437Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.514Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.590Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.669Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.745Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.824Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.902Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:15.980Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.057Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.134Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.213Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.291Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.369Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.449Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.526Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.606Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.682Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.760Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.837Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.916Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:16.992Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.071Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.149Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.227Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.305Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.383Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.461Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.538Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.617Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.693Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.770Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.850Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:17.928Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:18.006Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    }
+  ]
+}

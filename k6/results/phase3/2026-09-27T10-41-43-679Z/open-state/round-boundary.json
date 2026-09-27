@@ -1,0 +1,35 @@
+{
+  "boundaryAt": "2026-09-27T11:00:00.000Z",
+  "clientTimer": {
+    "mode": "client-timer",
+    "initialRequestCount": 1,
+    "verificationRequestCount": 1,
+    "additionalPreBoundaryRequests": 0,
+    "initialRoundTripMs": 5,
+    "offsetMs": 1.5,
+    "scheduledWaitMs": 6954.5,
+    "actualWaitMs": 6974.46,
+    "activatedAt": "2026-09-27T11:00:00.000Z",
+    "boundaryAt": "2026-09-27T11:00:00.000Z",
+    "activationClockErrorMs": 0,
+    "immediateVerificationOpen": true,
+    "verificationDelayMs": 18,
+    "verificationOpen": true
+  },
+  "directPolling": {
+    "virtualClients": 1,
+    "clientRequestCount": 13,
+    "originRequestCount": 13,
+    "roundStartDetectionDelayMs": 122,
+    "unexpectedFailed": 0
+  },
+  "cachedPolling": {
+    "virtualClients": 1,
+    "clientRequestCount": 13,
+    "originRequestCount": 7,
+    "cacheHitCount": 6,
+    "cacheMissCount": 7,
+    "roundStartDetectionDelayMs": 129,
+    "unexpectedFailed": 0
+  }
+}

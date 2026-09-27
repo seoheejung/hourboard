@@ -32,7 +32,7 @@ HourBoard는 매시 정각 하나의 시간 슬롯을 열고, 해당 슬롯에 �
 - Server Time Synchronization
 - E2E Concurrency Test
 
-### Phase 3 예정
+### Phase 3 구현·검증
 
 - Load Test
 - p50 / p95 / p99 Latency
@@ -42,6 +42,8 @@ HourBoard는 매시 정각 하나의 시간 슬롯을 열고, 해당 슬롯에 �
 - HTTP Shared Cache
 - Cache Hit / Miss
 - Open-State Propagation Delay
+
+실제 로컬 PostgreSQL과 Fastify를 사용한 Phase 3 측정 결과는 [결과 문서](docs/results/phase3-load-race-verification.md)에 기록했다.
 
 ---
 
@@ -404,25 +406,21 @@ Registration Window 종료 후 REGISTRATION_CLOSED로 거부된 요청은 Positi
 - 다음 정각 5분 전 버튼 비활성 재표시
 - 보정된 서버 시각 기준 새 Round 전환
 
+### Phase 3 — Load, Race & Open-State Verification
+
+**상태: 완료**
+
+- 전용 `hourboard_loadtest` DB에서 Registration Race와 Thundering Herd 10 / 50 / 100 / 200 검증
+- `GET /api/open-state`, Client Timer, Direct Polling, 1초 TTL 로컬 공유 캐시 비교
+- 실제 정각 탐지와 polling 100 / 500 / 1000 client 측정
+- Winner 1명, accepted 순위 `1..S`, 중복·누락·승자 문구 변경 0건 확인
+- 결과: [Phase 3 측정 및 제한사항](docs/results/phase3-load-race-verification.md)
+
+로컬 Compose PostgreSQL 실행 후 `NODE_ENV=test`, 로컬 `DATABASE_URL`, 포터블 k6의 `K6_BIN`을 셸 환경 변수로 설정하고 `npm.cmd run load:phase3`으로 전체 측정을 재실행할 수 있다. 스크립트는 별도 load-test DB를 사용하며 실제 다음 정각을 관찰한다.
+
 ---
 
 ## 이후 작업
-
-### Phase 3 — Load, Race & Open-State Verification
-
-**상태: 예정**
-
-- Registration Race: 10 / 50 / 100 / 200
-- 10초 Registration Window 정합성 검증
-- p50 / p95 / p99 / RPS
-- PostgreSQL lock contention
-- Client Timer baseline
-- Direct Polling
-- Cached Polling
-- local shared-cache simulation
-- Open-State detection delay
-- Thundering Herd 검증
-- 반복 가능한 성능 아티팩트 생성
 
 ### Phase 4 — OCI Deployment
 

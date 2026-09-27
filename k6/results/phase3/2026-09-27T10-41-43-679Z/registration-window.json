@@ -1,0 +1,28 @@
+{
+  "slotAt": "2026-09-27T10:00:00.000Z",
+  "requested": 3,
+  "accepted": 2,
+  "registrationClosed": 1,
+  "unexpectedFailed": 0,
+  "winnerCount": 1,
+  "minPosition": 1,
+  "maxPosition": 2,
+  "duplicatePositions": 0,
+  "missingPositions": 0,
+  "winnerMessageMutations": 0,
+  "closesAt": "2026-09-27T10:41:55.520Z",
+  "closedStatus": 409,
+  "closedCode": "REGISTRATION_CLOSED",
+  "closedPosition": null,
+  "closedWinner": false,
+  "attemptCountBeforeClose": 2,
+  "attemptCountAfterClose": 2,
+  "openStateAfterClose": {
+    "serverTime": "2026-09-27T10:41:55.649Z",
+    "slotAt": "2026-09-27T10:00:00.000Z",
+    "roundEndsAt": "2026-09-27T11:00:00.000Z",
+    "winnerExists": true,
+    "registrationOpen": false,
+    "registrationClosesAt": "2026-09-27T10:41:55.520Z"
+  }
+}

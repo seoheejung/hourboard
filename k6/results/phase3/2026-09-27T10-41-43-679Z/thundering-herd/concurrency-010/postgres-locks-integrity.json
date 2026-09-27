@@ -1,0 +1,360 @@
+{
+  "samplingIntervalMs": 75,
+  "sampleCount": 39,
+  "maxActiveConnections": 0,
+  "maxLockWaitingConnections": 0,
+  "maxUngrantedLocks": 0,
+  "samples": [
+    {
+      "at": "2026-09-27T11:02:09.955Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.048Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.123Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.203Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.280Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.359Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.437Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.516Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.593Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.672Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.749Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.828Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.907Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:10.983Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.060Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.137Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.214Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.292Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.371Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.448Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.527Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.603Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.681Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.759Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.835Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.914Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:11.991Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.069Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.147Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.225Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.301Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.378Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.457Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.534Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.612Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.689Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.767Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.845Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    },
+    {
+      "at": "2026-09-27T11:02:12.924Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 2
+      }
+    }
+  ]
+}

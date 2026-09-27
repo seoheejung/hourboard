@@ -1,0 +1,22 @@
+{
+  "requested": 200,
+  "accepted": 200,
+  "registrationClosed": 0,
+  "unexpectedFailed": 0,
+  "winnerCount": 1,
+  "p50Ms": 110.545,
+  "p95Ms": 190.834,
+  "p99Ms": 198.286,
+  "minMs": 22.836,
+  "maxMs": 199.373,
+  "rps": 38.905,
+  "firstDispatchEpochMs": 1790506963073,
+  "lastDispatchEpochMs": 1790506963095,
+  "concurrency": 200,
+  "slotAt": "2026-09-27T11:00:00.000Z",
+  "dispatchSpreadMs": 22,
+  "acceptanceRate": 1,
+  "unexpectedErrorRate": 0,
+  "dbAttemptCount": 200,
+  "winnerMessageValid": true
+}

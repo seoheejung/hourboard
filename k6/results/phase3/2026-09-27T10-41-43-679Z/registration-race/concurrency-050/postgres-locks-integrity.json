@@ -1,0 +1,28 @@
+{
+  "samplingIntervalMs": 75,
+  "sampleCount": 2,
+  "maxActiveConnections": 4,
+  "maxLockWaitingConnections": 3,
+  "maxUngrantedLocks": 3,
+  "samples": [
+    {
+      "at": "2026-09-27T10:42:00.942Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T10:42:01.025Z",
+      "active_connections": 4,
+      "lock_waiting_connections": 3,
+      "ungranted_locks": 3,
+      "wait_event_types": {
+        "Lock": 3,
+        "Client": 7
+      }
+    }
+  ]
+}

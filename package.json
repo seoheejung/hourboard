@@ -14,7 +14,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "e2e": "npm run e2e:phase1 && npm run e2e:phase2",
     "e2e:phase1": "tsx tests/e2e/run-e2e.ts",
-    "e2e:phase2": "tsx tests/e2e/run-ui-e2e.ts"
+    "e2e:phase2": "tsx tests/e2e/run-ui-e2e.ts",
+    "load:phase3": "node tests/load/run-phase3.mjs"
   },
   "dependencies": {
     "@fastify/static": "^10.1.2",

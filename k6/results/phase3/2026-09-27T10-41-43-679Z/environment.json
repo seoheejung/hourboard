@@ -1,0 +1,19 @@
+{
+  "measuredAt": "2026-09-27T10:41:45.464Z",
+  "target": "local",
+  "os": "win32 10.0.26200",
+  "cpu": "AMD Ryzen 7 260 w/ Radeon 780M Graphics        ",
+  "logicalCores": 16,
+  "memoryBytes": 33565126656,
+  "nodeVersion": "v24.19.0",
+  "postgresVersion": "18.6 (Debian 18.6-1.pgdg13+2)",
+  "k6Version": "k6.exe v2.3.0 (commit/e088784614, go1.26.8, windows/amd64)",
+  "dockerDesktop": "not observed (Docker API inaccessible)",
+  "postgresContainerResourceLimit": null,
+  "database": "hourboard_loadtest",
+  "databaseDisposition": "retained",
+  "registrationWindowSeconds": 10,
+  "sharedCacheTtlMs": 1000,
+  "postgresSamplingIntervalMs": 75,
+  "apiBase": "http://127.0.0.1:56816"
+}

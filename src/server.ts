@@ -5,6 +5,7 @@ import { readConfig } from './config/env.js';
 import { createPool } from './db/pool.js';
 import { registerAttempts } from './routes/attempts.js';
 import { registerHealth } from './routes/health.js';
+import { registerOpenState } from './routes/open-state.js';
 import { registerRound } from './routes/round.js';
 import { apiError } from './shared/types.js';
 
@@ -25,6 +26,7 @@ app.setErrorHandler((error, _request, reply) => {
 });
 registerHealth(app, pool);
 registerRound(app, pool);
+registerOpenState(app, pool);
 registerAttempts(app, pool);
 await app.register(fastifyStatic, { root: join(process.cwd(), 'public'), prefix: '/' });
 app.setNotFoundHandler((request, reply) => {

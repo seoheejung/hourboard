@@ -1,0 +1,20 @@
+{
+  "measuredAt": "2026-09-27T11:05:06.164Z",
+  "concurrency": 50,
+  "slotAt": "2026-09-27T11:00:00.000Z",
+  "requested": 50,
+  "accepted": 50,
+  "unexpectedFailed": 0,
+  "originRequestCount": 50,
+  "dispatchSpreadMs": 2,
+  "p50Ms": 25.781,
+  "p95Ms": 36.983,
+  "p99Ms": 42.11,
+  "rps": 10.043,
+  "unexpectedErrorRate": 0,
+  "stateAfterBurst": {
+    "slotAt": "2026-09-27T11:00:00.000Z",
+    "winnerExists": false,
+    "registrationOpen": true
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "samplingIntervalMs": 75,
+  "sampleCount": 4,
+  "maxActiveConnections": 9,
+  "maxLockWaitingConnections": 7,
+  "maxUngrantedLocks": 2,
+  "samples": [
+    {
+      "at": "2026-09-27T10:42:11.702Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T10:42:11.825Z",
+      "active_connections": 0,
+      "lock_waiting_connections": 0,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "Client": 11
+      }
+    },
+    {
+      "at": "2026-09-27T10:42:11.887Z",
+      "active_connections": 9,
+      "lock_waiting_connections": 3,
+      "ungranted_locks": 0,
+      "wait_event_types": {
+        "IO": 1,
+        "Lock": 1,
+        "Client": 2,
+        "LWLock": 5
+      }
+    },
+    {
+      "at": "2026-09-27T10:42:11.962Z",
+      "active_connections": 9,
+      "lock_waiting_connections": 7,
+      "ungranted_locks": 2,
+      "wait_event_types": {
+        "IO": 1,
+        "Lock": 4,
+        "Client": 3,
+        "LWLock": 1
+      }
+    }
+  ]
+}
