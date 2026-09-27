@@ -1,0 +1,32 @@
+{
+  "scenario": "window",
+  "startedAt": "2026-09-27T14:47:36.746Z",
+  "base": "http://127.0.0.1:3101",
+  "database": "hourboard_phase4_gate",
+  "initialDatabaseTime": "2026-09-27T14:47:36.769Z",
+  "slotAt": "2026-09-27T14:00:00.000Z",
+  "registrationClosesAt": "2026-09-27T14:47:46.817Z",
+  "lockAcquiredAt": "2026-09-27T14:47:36.822Z",
+  "followupSentAt": "2026-09-27T14:47:45.976Z",
+  "blockedQueriesBeforeClose": 1,
+  "lockReleasedAt": "2026-09-27T14:47:47.081Z",
+  "followup": {
+    "status": 409,
+    "code": "REGISTRATION_CLOSED",
+    "position": null
+  },
+  "winnerCount": 1,
+  "requestCount": 2,
+  "successCount": 1,
+  "failureCount": 1,
+  "positionRange": [
+    1,
+    1
+  ],
+  "duplicatePositionCount": 0,
+  "missingPositionCount": 0,
+  "winnerMessageMutationCount": 0,
+  "finalAttemptCount": 1,
+  "passed": true,
+  "finishedAt": "2026-09-27T14:47:47.085Z"
+}

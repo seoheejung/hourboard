@@ -1,0 +1,41 @@
+{
+  "status": "Local gate checks completed; post-fix actual hour boundary not yet retested",
+  "environment": "Local Windows, Node.js 24, isolated PostgreSQL 18 database hourboard_phase4_gate",
+  "countdown": {
+    "actualBrowserExample": "26:31",
+    "actualBrowserWindowExample": "등록 마감까지 4초",
+    "noticePreserved": "서버 시간 기준이며, 오차가 있을 수 있습니다."
+  },
+  "remoteWinnerUi": {
+    "issueReproducedBeforeFix": true,
+    "openStatePollingApplied": true,
+    "actualBrowserPassedAfterFix": true,
+    "artifact": "tests/e2e/artifacts/phase4-local-browser-ui.json"
+  },
+  "hourBoundary": {
+    "issueReproducedAtActualBoundary": "2026-09-27T15:00:00.000Z",
+    "blockedDatabaseQueriesBeforeBoundary": 2,
+    "oldSlotReturnedAfterBoundary": true,
+    "responseSlotRecheckAndOneReloadApplied": true,
+    "postFixActualBoundaryRetested": false,
+    "artifact": "tests/e2e/artifacts/phase4-local-hour-boundary-before-fix.json"
+  },
+  "databaseFinalDecision": {
+    "tenSecondWindowLockWaitPassed": true,
+    "hourBoundaryLockWaitPassed": true,
+    "atomicUpsertModified": false,
+    "artifacts": [
+      "tests/e2e/artifacts/phase4-local-window-boundary.json",
+      "tests/e2e/artifacts/phase4-local-hour-boundary-before-fix.json"
+    ]
+  },
+  "verificationAfterFix": {
+    "npmRunBuild": "passed",
+    "npmRunE2ePhase1": "passed",
+    "npmRunE2ePhase2": "passed",
+    "postFixOrdinaryRoundSmoke": {
+      "serverTime": "2026-09-27T15:03:48.302Z",
+      "currentSlot": "2026-09-27T15:00:00.000Z"
+    }
+  }
+}

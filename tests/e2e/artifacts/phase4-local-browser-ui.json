@@ -1,0 +1,34 @@
+{
+  "environment": "Actual Chrome browser, local Fastify server, isolated PostgreSQL database hourboard_phase4_gate",
+  "originalRemoteWinnerObservation": {
+    "winnerAt": "2026-09-27T14:23:13.405Z",
+    "clientAFirstObservedAt": "2026-09-27T14:23:23.347Z",
+    "clientAFirstStatus": "등록 마감까지 1초",
+    "registrationClosesAt": "2026-09-27T14:23:23.410Z",
+    "clientAButtonHiddenAt": "2026-09-27T14:23:23.493Z",
+    "issueReproduced": true
+  },
+  "afterOpenStatePolling": {
+    "winnerAt": "2026-09-27T14:27:56.787Z",
+    "clientAFirstObservedAt": "2026-09-27T14:27:57.731Z",
+    "clientAFirstStatus": "등록 마감까지 10초",
+    "registrationClosesAt": "2026-09-27T14:28:06.792Z",
+    "clientAButtonHiddenAt": "2026-09-27T14:28:06.836Z",
+    "lateAttemptHttpStatus": 409,
+    "lateAttemptCode": "REGISTRATION_CLOSED",
+    "finalDbAttemptCount": 1,
+    "passed": true
+  },
+  "display": {
+    "nextHourExample": "26:31",
+    "registrationWindowExample": "등록 마감까지 4초",
+    "notice": "서버 시간 기준이며, 오차가 있을 수 있습니다.",
+    "browserVerified": true
+  },
+  "stepsToRepeat": [
+    "Start the application with hourboard_phase4_gate and open two Chrome tabs on the local URL.",
+    "Wait for Client A to show the current open round; register a Winner from Client B.",
+    "Observe Client A status each frame through registrationClosesAt and confirm the button hides after closure.",
+    "Submit a late attempt and compare the response with the database attempt count."
+  ]
+}

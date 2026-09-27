@@ -7,11 +7,17 @@ import { apiError } from '../shared/types.js';
 export function registerRound(app: FastifyInstance, pool: pg.Pool) {
   app.get('/api/round', async (_request, reply) => {
     const now = new Date();
-    const slot = currentSlot(now);
-    const end = nextSlot(slot);
+    let slot = currentSlot(now);
     try {
-      const row = await getSlot(pool, slot);
-      const responseTime = new Date();
+      let row = await getSlot(pool, slot);
+      let responseTime = new Date();
+      const responseSlot = currentSlot(responseTime);
+      if (responseSlot.getTime() !== slot.getTime()) {
+        slot = responseSlot;
+        row = await getSlot(pool, slot);
+        responseTime = new Date();
+      }
+      const end = nextSlot(slot);
       const registrationClosesAt = row
         ? new Date(Math.min(row.created_at.getTime() + 10_000, end.getTime()))
         : null;

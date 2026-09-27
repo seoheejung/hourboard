@@ -17,6 +17,7 @@ const submitButton = element('submit-button');
 const result = element('result');
 const HOUR_MS = 3_600_000;
 const BUTTON_PREVIEW_MS = 5 * 60_000;
+const OPEN_STATE_POLL_MS = 1000;
 const MAX_MESSAGE_LENGTH = 120;
 let serverOffsetMs = 0;
 let round = null;
@@ -25,7 +26,9 @@ let registrationClosesAt = null;
 let localWinner = null;
 let pending = false;
 let syncInFlight = false;
+let openStateInFlight = false;
 let roundError = false;
+let openStateError = false;
 let observedBoundary = null;
 let boundaryRetryCount = 0;
 let displayedBoardMessage = '';
@@ -105,6 +108,7 @@ function applyRound(next) {
     if (previousSlot && previousSlot !== next.currentSlot.startsAt) {
         localWinner = null;
         registrationClosesAt = null;
+        openStateError = false;
         boundaryRetryCount = 0;
         result.replaceChildren();
         delete result.dataset.state;
@@ -154,6 +158,51 @@ async function syncRound() {
         }
     }
 }
+async function syncOpenState() {
+    if (openStateInFlight || !round || pending || round.currentSlot.registrationOpen === false
+        || registrationClosesAt || serverNow() >= Date.parse(round.currentSlot.endsAt))
+        return;
+    openStateInFlight = true;
+    const requestedSlot = round.currentSlot.startsAt;
+    try {
+        const response = await fetch('/api/open-state');
+        if (!response.ok)
+            throw new Error('Open state unavailable');
+        const data = await response.json();
+        if (!Number.isFinite(Date.parse(data.slotAt)) || typeof data.winnerExists !== 'boolean'
+            || typeof data.registrationOpen !== 'boolean'
+            || (data.registrationClosesAt !== null && !Number.isFinite(Date.parse(data.registrationClosesAt)))
+            || (data.winnerExists && data.registrationClosesAt === null)) {
+            throw new Error('Invalid open state response');
+        }
+        if (!round || round.currentSlot.startsAt !== requestedSlot)
+            return;
+        if (data.slotAt !== requestedSlot) {
+            if (Date.parse(data.slotAt) > Date.parse(requestedSlot))
+                void syncRound();
+            return;
+        }
+        openStateError = false;
+        if (data.registrationClosesAt) {
+            registrationClosesAt = data.registrationClosesAt;
+            round.currentSlot.registrationClosesAt = data.registrationClosesAt;
+            round.currentSlot.registrationOpen = data.registrationOpen;
+            void syncRound();
+        }
+        else if (!data.registrationOpen) {
+            round.currentSlot.registrationOpen = false;
+            void syncRound();
+        }
+    }
+    catch {
+        if (round?.currentSlot.startsAt === requestedSlot)
+            openStateError = true;
+    }
+    finally {
+        openStateInFlight = false;
+        tick();
+    }
+}
 function tick() {
     if (!round) {
         roundStatus.textContent = roundError ? '서버 연결을 확인해 주세요.' : '서버 시각을 확인하는 중입니다.';
@@ -176,11 +225,13 @@ function tick() {
     }
     const minutes = Math.floor(remainingMs / 60_000);
     const seconds = Math.floor((remainingMs % 60_000) / 1000);
-    countdown.textContent = `${minutes}분 ${seconds}초`;
+    countdown.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     if (pending)
         roundStatus.textContent = '등록 결과를 기다리는 중입니다.';
     else if (roundError)
         roundStatus.textContent = '전광판 갱신이 지연되고 있습니다.';
+    else if (openStateError && !registrationClosesAt)
+        roundStatus.textContent = '등록 상태 갱신이 지연되고 있습니다.';
     else if (targetSlotAt && serverNow() < Date.parse(targetSlotAt))
         roundStatus.textContent = '문구를 미리 입력하고 다음 정각에 등록해 주세요.';
     else if (targetSlotAt && serverNow() >= Date.parse(targetSlotAt) + HOUR_MS)
@@ -277,3 +328,4 @@ form.addEventListener('submit', async (event) => {
 void syncRound();
 setInterval(tick, 50);
 setInterval(() => { void syncRound(); }, 10_000);
+setInterval(() => { void syncOpenState(); }, OPEN_STATE_POLL_MS);

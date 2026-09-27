@@ -1,0 +1,36 @@
+{
+  "scenario": "hour",
+  "startedAt": "2026-09-27T14:41:06.616Z",
+  "base": "http://127.0.0.1:3101",
+  "database": "hourboard_phase4_gate",
+  "initialDatabaseTime": "2026-09-27T14:41:06.648Z",
+  "previousSlotAt": "2026-09-27T14:00:00.000Z",
+  "boundaryAt": "2026-09-27T15:00:00.000Z",
+  "lockAcquiredAt": "2026-09-27T14:59:57.025Z",
+  "requestsSentAt": "2026-09-27T14:59:59.013Z",
+  "blockedQueriesBeforeBoundary": 2,
+  "lockReleasedAt": "2026-09-27T15:00:00.264Z",
+  "round": {
+    "status": 200,
+    "serverTime": "2026-09-27T15:00:00.264Z",
+    "slotAt": "2026-09-27T14:00:00.000Z",
+    "endsAt": "2026-09-27T15:00:00.000Z"
+  },
+  "attempt": {
+    "status": 409,
+    "code": "ROUND_ENDED",
+    "position": null
+  },
+  "winnerCount": 0,
+  "requestCount": 1,
+  "successCount": 0,
+  "failureCount": 1,
+  "positionRange": null,
+  "duplicatePositionCount": 0,
+  "missingPositionCount": 0,
+  "winnerMessageMutationCount": 0,
+  "roundBoundaryPassed": false,
+  "dbFinalDecisionPassed": true,
+  "passed": false,
+  "finishedAt": "2026-09-27T15:00:00.269Z"
+}

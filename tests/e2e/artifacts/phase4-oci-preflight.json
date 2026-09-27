@@ -1,0 +1,22 @@
+{
+  "scope": "Read-only OCI preflight; no resources created",
+  "accountAccess": "signed in to OCI Console",
+  "accountStatus": "Free Trial",
+  "homeRegionShownByConsole": "NRT",
+  "activeRegionShownByConsole": "Japan East (Tokyo)",
+  "regionIdentifierShownByConsoleUrl": "ap-tokyo-1",
+  "freeEligibilityForProposedCompute": "not verified for this account",
+  "remainingFreeOcpuQuota": null,
+  "remainingFreeMemoryQuota": null,
+  "remainingFreeBootVolumeQuota": null,
+  "proposedShape": null,
+  "proposedOcpu": null,
+  "proposedMemoryGb": null,
+  "creationEstimatedCost": null,
+  "sshAccessReady": "not verified",
+  "domainReady": "not verified",
+  "dnsControl": "not verified",
+  "consoleAutomationLimit": "Quota filter controls were inside a frame unavailable to the browser accessibility tree; coordinate click was rejected by automatic approval review.",
+  "officialReference": "https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm",
+  "resourceCreation": "none by this agent during preflight"
+}
