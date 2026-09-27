@@ -18,6 +18,7 @@ logs/
 coverage/
 test-results/
 k6-results/
+k6/results/
 
 # Runtime
 *.pid
