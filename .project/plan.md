@@ -485,42 +485,61 @@ Phase 3에서 위 기능을 다시 설계하지 않는다.
 
 ### Phase 4 — OCI Deployment
 
-**상태: 다음 작업**
+**상태: 지금 작업**
 
 Phase 3 로컬 baseline을 수정하지 않고 비교 기준으로 사용한다. 실제 외부 환경에서 배포·복구·보안·latency를 검증한다.
+
+OCI 계정 생성은 완료되었으며 Home Region은 **Japan East (Tokyo)**, Region identifier는 **`ap-tokyo-1`**이다.
 
 세부 구현 기준은 `docs/instructions/phase4-oci-deployment.md`를 따른다.
 
 범위:
 
-- OCI account home region 확인
-- Phase 4 시작 시 OCI 공식 문서에서 현재 Always Free 조건 재확인
-- home region이 Seoul이고 실제 무료 Compute 생성이 가능한 경우에만 Seoul VM 생성
-- 무료 조건이 불명확하거나 capacity가 없으면 임의 유료 resource로 전환하지 않음
+- OCI account 및 Home Region `Japan East (Tokyo)` 확인
+- Phase 4 시작 시 OCI Console과 공식 문서에서 현재 Always Free 조건 재확인
+- 현재 계정에서 Tokyo Region의 무료 Compute eligibility 및 잔여 quota 확인
+- 생성하려는 Compute의 예상 비용이 0이고 무료 대상임이 명확하게 확인되는 경우에만 Tokyo VM 생성
+- 무료 조건이 불명확하거나 capacity가 없으면 다른 Region 또는 유료 resource로 임의 전환하지 않음
+- VM image 및 architecture 확인
 - Node.js 24 LTS 설치
 - PostgreSQL 18.x 설치
+- production DB / user 구성
 - application deployment
 - systemd service
 - PostgreSQL `localhost:5432` 제한
-- 운영 환경 변수
+- application internal port 외부 비공개
+- 운영 EnvironmentFile 구성
+- production에서 저장소 `.env` fallback 비의존 확인
 - HTTPS
+- production 최소 structured error logging
 - reboot recovery
+- DB data persistence
 - 실제 외부 환경 E2E
-- 핵심 Registration Race 재검증
+- Winner / Position / 10초 Registration Window 핵심 Registration Race 재검증
+- 실제 브라우저 핵심 흐름 검증
 - 외부 RTT 및 등록 latency 측정
-- Phase 3 로컬 baseline과 Phase 4 OCI 결과를 환경별로 분리 기록
+- Phase 3 로컬 baseline과 Phase 4 OCI Tokyo 결과를 환경별로 분리 기록
 
 완료 기준:
 
+- OCI Home Region이 `Japan East (Tokyo)`임을 확인
+- 현재 계정에서 사용한 Compute가 무료 대상임을 실제로 확인
+- 유료 resource 생성 없음
 - HTTPS로 서비스 접근 가능
 - PostgreSQL 5432 외부 접근 불가
 - application 내부 포트 불필요한 외부 공개 없음
+- production 환경 변수가 별도 EnvironmentFile로 주입됨
+- production에서 저장소 `.env` fallback에 의존하지 않음
 - VM reboot 후 PostgreSQL과 HourBoard 자동 복구
 - reboot 후 HTTPS 접근 재확인
+- reboot 전후 DB 데이터 유지
 - 배포 환경에서 Winner / Position / 10초 Registration Window 핵심 invariant 통과
+- 실제 브라우저에서 핵심 사용자 흐름 확인
 - 외부 RTT 기록
-- 등록 p50 / p95 / p99 기록
-- 로컬 Phase 3 결과와 OCI 결과를 같은 환경의 수치처럼 혼합하지 않음
+- GET `/api/round` 및 POST `/api/attempts` latency 측정
+- 등록 p50 / p95 / p99 및 sample 수 기록
+- 로컬 Phase 3 결과와 OCI Tokyo 결과를 같은 환경의 수치처럼 혼합하지 않음
+- Phase 4 artifact 생성
 - 실제 배포 환경 결과 문서 작성
 
 ---

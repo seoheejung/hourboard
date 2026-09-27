@@ -135,6 +135,17 @@ UPSERT의 DB 최종 판정은 유지한다.
 
 실제 경계 오류가 확인되지 않은 상태에서 시간 판정 구조를 선제 수정하지 않는다.
 
+#### Gate D — Countdown monotonicity
+
+검증:
+- 마지막 3초 구간 관찰
+- 10초 server time 재동기화와 겹치는 경우 포함
+- remainingMs가 증가하는지 기록
+- browser timer/rendering pause와 offset 변경을 구분
+
+재현되지 않으면 코드 변경 없음.
+재현되면 가장 좁은 수정만 검토.
+
 #### Gate 완료 조건
 
 ```text
