@@ -176,8 +176,7 @@ function tick() {
     }
     const minutes = Math.floor(remainingMs / 60_000);
     const seconds = Math.floor((remainingMs % 60_000) / 1000);
-    const millis = Math.floor(remainingMs % 1000);
-    countdown.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+    countdown.textContent = `${minutes}분 ${seconds}초`;
     if (pending)
         roundStatus.textContent = '등록 결과를 기다리는 중입니다.';
     else if (roundError)

@@ -33,7 +33,7 @@ h2 { margin: 0; font-size: 1.03rem; letter-spacing: -.025em; }
 .attempt-section { margin-top: 24px; }
 .countdown-block { text-align: center; padding: 14px 0 18px; border-top: 1px solid #354348; }
 .countdown-block h2 { color: #aebfba; font-size: .9rem; font-weight: 650; }
-.countdown { font: 700 clamp(2rem, 5vw, 2.7rem)/1.15 ui-monospace, "SFMono-Regular", Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: -.08em; white-space: nowrap; margin: 6px 0; }
+.countdown { font-family: inherit; font-size: clamp(2rem, 5vw, 2.7rem); font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: -.04em; white-space: nowrap; margin: 6px 0; }
 .round-status { min-height: 1.4em; color: #aebfba; font-size: .75rem; margin: 0; }
 form label { display: block; font-weight: 750; margin-bottom: 7px; font-size: .9rem; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

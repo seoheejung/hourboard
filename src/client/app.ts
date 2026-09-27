@@ -194,8 +194,7 @@ function tick() {
   }
   const minutes = Math.floor(remainingMs / 60_000);
   const seconds = Math.floor((remainingMs % 60_000) / 1000);
-  const millis = Math.floor(remainingMs % 1000);
-  countdown.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+  countdown.textContent = `${minutes}분 ${seconds}초`;
   if (pending) roundStatus.textContent = '등록 결과를 기다리는 중입니다.';
   else if (roundError) roundStatus.textContent = '전광판 갱신이 지연되고 있습니다.';
   else if (targetSlotAt && serverNow() < Date.parse(targetSlotAt)) roundStatus.textContent = '문구를 미리 입력하고 다음 정각에 등록해 주세요.';
