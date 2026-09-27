@@ -29,6 +29,7 @@ let roundError = false;
 let observedBoundary = null;
 let boundaryRetryCount = 0;
 let displayedBoardMessage = '';
+let clearedClosedSlotAt = null;
 function serverNow() { return Date.now() + serverOffsetMs; }
 function validMessage() {
     const value = input.value;
@@ -165,6 +166,14 @@ function tick() {
     const registrationClosed = round.currentSlot.registrationOpen === false
         || (registrationClosesAt !== null && now >= Date.parse(registrationClosesAt));
     submitButton.hidden = registrationClosed && remainingMs > BUTTON_PREVIEW_MS;
+    if (submitButton.hidden && !pending && clearedClosedSlotAt !== round.currentSlot.startsAt) {
+        clearedClosedSlotAt = round.currentSlot.startsAt;
+        input.value = '';
+        remaining.textContent = `${MAX_MESSAGE_LENGTH}자 남음`;
+        input.setAttribute('aria-invalid', 'false');
+        result.replaceChildren();
+        delete result.dataset.state;
+    }
     const minutes = Math.floor(remainingMs / 60_000);
     const seconds = Math.floor((remainingMs % 60_000) / 1000);
     const millis = Math.floor(remainingMs % 1000);
@@ -180,7 +189,7 @@ function tick() {
     else if (registrationClosed && remainingMs <= BUTTON_PREVIEW_MS)
         roundStatus.textContent = '다음 정각에 등록 버튼이 활성화됩니다.';
     else if (registrationClosed)
-        roundStatus.textContent = '이번 라운드의 등록이 마감되었습니다.';
+        roundStatus.textContent = '다음 정각 5분 전에 등록 버튼이 나타납니다.';
     else if (registrationClosesAt)
         roundStatus.textContent = `등록 마감까지 ${Math.ceil((Date.parse(registrationClosesAt) - serverNow()) / 1000)}초`;
     else
