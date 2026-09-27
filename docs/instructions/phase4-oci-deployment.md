@@ -1,7 +1,9 @@
 # HourBoard Phase 4 — OCI Deployment 구현 지시서
 
 > 대상: OpenAI Codex
+
 >
+
 > 목표: Phase 1~3이 완료된 HourBoard를 OCI Seoul Always Free Compute에 배포하고, Node.js + PostgreSQL을 동일 VM에서 운영하며 HTTPS, systemd 자동 복구, PostgreSQL localhost 제한, 외부 E2E와 실제 외부 latency를 검증한다.
 
 ---
@@ -30,12 +32,122 @@ README.md
 .project/plan.md
 AGENTS.md
 README.md
+docs/codebase-assumptions-review.md
 docs/results/phase1-concurrency-core.md
 docs/results/phase2-ticketing-ui.md
 docs/results/phase3-load-race-verification.md
 ```
 
 Phase 1~3이 실제 완료되지 않았다면 Phase 4 완료로 처리하지 않는다.
+
+`docs/codebase-assumptions-review.md`의 분류를 그대로 따른다.
+
+```text
+검증됨
+→ 실제 코드에서 확인된 사실
+→ 근거 없이 변경하지 않음
+
+추측됨
+→ 코드 또는 로컬 결과만으로 보장할 수 없는 전제
+→ Phase 4에서 먼저 검증
+→ 실제 문제가 확인된 경우에만 최소 범위 수정
+```
+
+Phase 3 baseline, atomic UPSERT, Winner/Position semantics, 10초 Registration Window를 Phase 4 편의를 위해 임의로 재설계하지 않는다.
+
+### 0.1 Local Pre-Deployment Gate
+
+OCI 리소스를 생성하기 전에 로컬 코드베이스에서 아래 검증을 먼저 수행한다.
+
+#### Gate A — 원격 Winner와 Registration Window UI 동기화
+
+현재 구현은 브라우저가 `/api/round`로 시각을 보정하고 주기적으로 상태를 동기화하며 `/api/open-state`는 UI에서 사용하지 않는다.
+
+먼저 실제 브라우저 또는 재현 가능한 E2E로 아래를 검증한다.
+
+```text
+Client A
+→ 현재 Round에 Winner 없음
+
+Client B
+→ 등록 성공
+→ Winner 확정
+→ 10초 Registration Window 시작
+
+Client A
+→ 다른 사용자의 Winner 발생 인지
+→ registrationClosesAt 인지
+→ Window 종료 시 등록 버튼 마감 상태 반영
+```
+
+현재 구현만으로 제품이 의도한 시점에 상태가 반영되면 코드 변경 없이 유지한다.
+
+문제가 재현될 때만 아래 최소 수정안을 검토한다.
+
+```text
+등록 가능 상태를 표시하는 동안만 GET /api/open-state polling
+→ winnerExists / registrationClosesAt 수신
+→ 이후 브라우저 timer로 마감 시각 계산
+→ 마감 후 polling 중단
+```
+
+`/api/open-state`는 UI 상태 힌트이며 등록 승인 신호가 아니다.
+
+최종 등록 허용 여부는 계속 `POST /api/attempts`와 PostgreSQL이 판정한다.
+
+#### Gate B — `/api/round` 정각 경계
+
+실제 정각 경계 E2E를 먼저 수행한다.
+
+검증 대상:
+
+```text
+정각 직전 /api/round 요청 시작
+→ DB 조회 중 정각 경과 가능
+→ 응답이 어느 Slot 기준인지 확인
+```
+
+정각 경계 오류가 재현되지 않으면 코드를 변경하지 않는다.
+
+오류가 재현될 때만 아래 최소 수정안을 검토한다.
+
+```text
+응답 직전 현재 Slot 재계산
+→ 요청 시작 시 Slot과 달라졌다면 새 Slot 1회 재조회
+→ 새 Slot 기준 응답
+```
+
+#### Gate C — 사전 판정과 DB 최종 판정
+
+Node의 Round 사전 판정과 PostgreSQL의 `clock_timestamp()` 최종 판정 사이에는 요청 처리, connection pool 대기, query 실행 시간이 흐를 수 있다.
+
+이 차이는 먼저 검증한다.
+
+```text
+API Round 사전 판정
+→ request 처리
+→ pool 대기 가능
+→ PostgreSQL UPSERT
+→ clock_timestamp() 최종 판정
+```
+
+UPSERT의 DB 최종 판정은 유지한다.
+
+실제 경계 오류가 확인되지 않은 상태에서 시간 판정 구조를 선제 수정하지 않는다.
+
+#### Gate 완료 조건
+
+```text
+[ ] npm run build 성공
+[ ] npm run e2e 성공
+[ ] 원격 Winner / 10초 Window UI 동기화 검증
+[ ] /api/round 정각 경계 검증
+[ ] 사전 판정 / DB 최종 판정 경계 검증
+[ ] 필요한 경우에만 최소 수정
+[ ] 수정 발생 시 build / E2E 재통과
+```
+
+Gate 결과는 `docs/results/phase4-oci-deployment.md`에 실제 결과만 기록한다.
 
 ---
 
@@ -47,7 +159,8 @@ Phase 4는 실제 OCI 리소스를 다루므로 아래 조건을 먼저 확인�
 OCI 계정 존재
 OCI home region 확인
 home region = Seoul
-Always Free Compute 사용 가능
+현재 계정에서 Always Free eligible Compute 사용 가능 여부 확인
+현재 계정의 실제 무료 quota 확인
 SSH key 준비
 OCI 인증 가능
 공개 HTTPS에 사용할 domain 준비
@@ -56,27 +169,26 @@ DNS 변경 권한 보유
 
 ### 중요
 
-OCI Always Free Compute는 계정의 **home region에서만** 생성 가능하다.
+이 문서에 적힌 과거 무료 사양 숫자만 근거로 리소스를 생성하지 않는다.
 
-따라서 home region이 Seoul이 아니면 `Seoul Always Free Compute`라는 현재 Phase 요구사항을 충족할 수 없다.
-
-이 경우 다른 region으로 임의 변경하지 말고 blocker로 기록한다.
-
-### Always Free 범위
-
-현재 Phase에서는 Always Free 범위를 넘어서는 리소스를 만들지 않는다.
-
-A1 사용 시 목표 상한:
+리소스 생성 직전에 아래 두 정보를 기준으로 실제 무료 여부를 확인한다.
 
 ```text
-VM.Standard.A1.Flex
-2 OCPU
-12 GB memory
+1. 현재 OCI Console에 표시되는 eligibility / quota
+2. 실행 시점의 OCI 공식 Free Tier / Always Free 문서
 ```
 
-이 값은 무료 tenancy 전체의 A1 무료 범위 안에서 사용 가능한 최대 구성으로 취급한다.
+현재 계정에서 무료임이 명확하게 확인되는 범위 안에서만 구성한다.
 
-기존 A1 인스턴스가 이미 무료 quota를 사용 중이면 남은 quota를 확인한다.
+home region이 Seoul이 아니거나 Seoul에서 현재 Phase의 무료 Compute 조건을 충족할 수 없으면 다른 region 또는 유료 리소스로 임의 변경하지 않고 blocker로 기록한다.
+
+### Compute 구성
+
+A1을 사용할 수 있다면 실제 Console에서 무료로 확인되는 OCPU / memory 범위 안에서 필요한 최소 구성을 선택한다.
+
+고정값을 무료 최대치로 간주하지 않는다.
+
+기존 무료 리소스가 quota를 사용 중이면 잔여 quota를 확인한다.
 
 무료 여부가 불명확하면 생성하지 않는다.
 
@@ -86,18 +198,23 @@ VM.Standard.A1.Flex
 
 ### 승인
 
-- OCI Always Free eligible Compute 1대 생성
+- OCI에서 현재 계정 기준 Always Free eligible로 확인된 Compute 1대 생성
 - Seoul home region 내 VCN/subnet/security rule 구성
-- public IPv4 할당
+- 무료 범위의 public IPv4 할당
 - SSH 접속
-- Ubuntu 24.04 LTS ARM64 또는 현재 프로젝트와 호환되는 안정 Linux image 사용
+- 프로젝트와 호환되는 안정 Linux image 선택
+- 선택한 VM architecture에서 Node.js 24 LTS 설치 가능성 확인
+- 선택한 VM architecture에서 PostgreSQL 18.x 설치 가능성 확인
 - Node.js 24 LTS 설치
 - PostgreSQL 18.x 설치
-- reverse proxy 설치
-- HTTPS 인증서 발급
+- HTTPS 종료 방식 결정
+- reverse proxy를 선택한 경우 reverse proxy 1개 설치
+- 공개 HTTPS 인증서 발급
 - systemd service 생성
 - application 배포
-- production environment file 생성
+- 별도 production environment file 생성
+- production에서 저장소 `.env` 자동 fallback 차단
+- production 최소 구조화 오류 로그 적용
 - PostgreSQL local-only 구성
 - firewall 설정
 - 외부 E2E 수행
@@ -109,6 +226,7 @@ VM.Standard.A1.Flex
 
 ### 승인하지 않음
 
+- 무료 여부를 확인하지 않은 Compute shape
 - 유료 Compute shape
 - 유료 Load Balancer
 - 유료 managed database
@@ -123,6 +241,8 @@ VM.Standard.A1.Flex
 - 별도 monitoring SaaS
 - domain 구매
 - 사용자 동의 없는 paid resource 전환
+- Phase 3 baseline 수정
+- atomic UPSERT 재설계
 - `git push`
 
 ---
@@ -134,11 +254,17 @@ VM.Standard.A1.Flex
 아래 상황이면 즉시 생성 작업을 중단한다.
 
 ```text
+
 예상 비용이 0이 아님
+
 Always Free 표시 없음
+
 A1 무료 quota 초과
+
 추가 block volume이 무료 범위를 넘음
+
 유료 public IP 또는 load balancer 필요
+
 ```
 
 무료인지 추측하지 않는다.
@@ -154,10 +280,15 @@ OCI Always Free는 capacity 부족으로 instance 생성이 실패할 수 있다
 `Out of host capacity` 또는 이에 준하는 오류가 발생하면:
 
 ```text
+
 1. 같은 home region 내 허용 가능한 availability domain 재시도
+
 2. 무료 범위를 넘는 shape으로 변경하지 않음
+
 3. 유료 계정 업그레이드를 자동 수행하지 않음
+
 4. 반복 실패 시 blocker 기록
+
 ```
 
 무료 capacity 부족을 코드 오류로 기록하지 않는다.
@@ -166,14 +297,16 @@ OCI Always Free는 capacity 부족으로 instance 생성이 실패할 수 있다
 
 ## 5. VM 기준 구성
 
-목표 구조:
+VM image를 먼저 확정하고 Node.js 24 / PostgreSQL 18 설치 가능성을 smoke 확인한 뒤 HTTPS 종료 방식을 결정한다.
+
+기본 배치 원칙:
 
 ```text
 Internet
    │
    │ HTTPS :443
    ▼
-Reverse Proxy
+HTTPS termination
    │
    │ 127.0.0.1:<APP_PORT>
    ▼
@@ -184,13 +317,31 @@ Node.js 24 / Fastify
 PostgreSQL 18
 ```
 
-외부에서 직접 접근 가능한 application port를 열지 않는다.
+HTTPS termination 구현은 Phase 4 시작 시 실제 환경을 보고 결정한다.
 
-외부 공개 포트:
+reverse proxy를 채택하는 경우:
+
+```text
+Internet
+→ 80 / 443
+→ Reverse Proxy
+→ 127.0.0.1:<APP_PORT>
+→ Fastify
+→ localhost:5432
+→ PostgreSQL
+```
+
+Fastify의 현재 `127.0.0.1` bind는 운영 구조와 호환되는 한 유지한다.
+
+외부에서 application internal port를 직접 열지 않는다.
+
+외부 공개 포트는 실제 선택한 HTTPS 구성에 필요한 최소 범위로 제한한다.
+
+일반적인 reverse proxy 구성에서는:
 
 ```text
 22/tcp   SSH
-80/tcp   HTTP → HTTPS redirect / certificate issuance
+80/tcp   HTTP redirect / ACME가 필요한 경우
 443/tcp  HTTPS
 ```
 
@@ -205,8 +356,11 @@ SSH는 key authentication을 사용한다.
 가능한 경우:
 
 ```text
+
 PasswordAuthentication no
+
 PermitRootLogin no
+
 ```
 
 설정 변경 전에 현재 SSH 접속이 유지되는지 확인한다.
@@ -224,15 +378,21 @@ Node.js 애플리케이션을 root로 실행하지 않는다.
 권장 이름:
 
 ```text
+
 hourboard
+
 ```
 
 권장 경로:
 
 ```text
+
 /opt/hourboard/current
+
 /etc/hourboard/hourboard.env
-/var/log/hourboard/   # 별도 파일 로그가 실제로 필요한 경우만
+
+/var/log/hourboard/   # 별도 파일 로그가 실제로 필요한 경우만
+
 ```
 
 systemd journal을 기본 로그로 사용한다.
@@ -248,8 +408,11 @@ VM architecture와 일치하는 Node.js 24 LTS를 설치한다.
 설치 후 실제 버전을 기록한다.
 
 ```text
+
 node --version
+
 npm --version
+
 ```
 
 prerelease 버전은 사용하지 않는다.
@@ -267,7 +430,9 @@ PostgreSQL 18.x를 설치한다.
 설치 후 버전을 기록한다.
 
 ```text
+
 psql --version
+
 ```
 
 운영 database/user를 로컬 개발 credential과 분리한다.
@@ -275,9 +440,13 @@ psql --version
 예상 구조:
 
 ```text
+
 database: hourboard
+
 user: hourboard_app
+
 password: 강한 랜덤 비밀번호
+
 ```
 
 비밀번호를 repository에 저장하지 않는다.
@@ -291,7 +460,9 @@ PostgreSQL은 외부 network interface에서 listen하지 않는다.
 목표:
 
 ```text
+
 listen_addresses = 'localhost'
+
 ```
 
 또는 동등하게 loopback만 허용한다.
@@ -301,8 +472,11 @@ listen_addresses = 'localhost'
 검증:
 
 ```text
+
 VM 내부 127.0.0.1:5432 → 연결 가능
+
 VM public IP:5432 → 외부 연결 불가
+
 ```
 
 OCI Security List/NSG에서도 5432 inbound rule이 없어야 한다.
@@ -325,6 +499,24 @@ Phase 4에서 production-only schema를 별도로 만들지 않는다.
 
 migration 성공 여부를 실제 명령 결과로 확인한다.
 
+새 DB에 migration을 적용한 직후 `hour_slots` metadata를 읽기 전용으로 확인한다.
+
+최소 대조:
+
+```text
+column 이름
+column type
+NOT NULL
+PRIMARY KEY
+DEFAULT
+attempt_count CHECK
+winner_message length CHECK
+```
+
+migration이 `IF NOT EXISTS`를 사용한다는 이유만으로 schema가 올바르다고 가정하지 않는다.
+
+새 migration framework나 schema 관리 도구는 도입하지 않는다.
+
 ---
 
 ## 12. Production 환경 변수
@@ -345,16 +537,22 @@ PORT=<localhost application port>
 DATABASE_URL=<production local PostgreSQL URL>
 ```
 
-파일 권한을 제한한다.
+이 파일은 **systemd가 명시적으로 읽는 운영 EnvironmentFile**이다.
 
-예:
+저장소 루트의 `.env` 자동 fallback과 구분한다.
+
+production에서는 저장소 `.env` fallback을 사용하지 않도록 한다.
+
+운영 EnvironmentFile 권한을 제한한다.
+
+권장:
 
 ```text
 owner: hourboard
 mode: 600
 ```
 
-실제 비밀번호를 README, 결과 문서, terminal capture artifact에 남기지 않는다.
+실제 비밀번호를 README, 결과 문서, shell history를 수집한 artifact, terminal capture artifact에 남기지 않는다.
 
 ---
 
@@ -367,9 +565,13 @@ mode: 600
 VM에서:
 
 ```text
+
 npm ci
+
 npm run build
+
 npm run db:migrate
+
 ```
 
 `npm install` 대신 lockfile 기반 `npm ci`를 우선한다.
@@ -393,11 +595,23 @@ EnvironmentFile=/etc/hourboard/hourboard.env
 Restart=on-failure
 ```
 
+실제 VM의 PostgreSQL unit 이름을 확인한 뒤 필요한 기동 의존 관계를 설정한다.
+
+존재하지 않는 unit 이름을 추측해 하드코딩하지 않는다.
+
+운영 환경 변수는 systemd의 명시적 `EnvironmentFile`로 주입하고 저장소 `.env` 자동 fallback에 의존하지 않는다.
+
 ExecStart는 실제 production build output을 직접 실행한다.
 
-가능하면 npm wrapper보다 `node <built-server-entry>`를 사용한다.
+가능하면 npm wrapper보다:
 
-실제 build output 경로를 확인해 작성한다.
+```text
+node <built-server-entry>
+```
+
+형태를 사용한다.
+
+실제 build output 경로를 확인한 뒤 작성한다.
 
 서비스 생성 후:
 
@@ -408,26 +622,56 @@ systemctl start hourboard
 systemctl status hourboard
 ```
 
-실제 서비스 상태를 확인한다.
+재시작 검증:
+
+```text
+systemctl restart hourboard
+systemctl status hourboard
+GET /health
+```
+
+환경 변수, WorkingDirectory, PostgreSQL 기동 순서가 실제 reboot에서도 유지되는지 Phase 4에서 확인한다.
 
 ---
 
-## 15. Reverse Proxy 및 HTTPS
+## 15. HTTPS 방식 결정 및 Reverse Proxy
+
+HTTPS 구현체를 문서만 보고 미리 확정하지 않는다.
+
+순서:
+
+```text
+1. VM image 확정
+2. Node.js 24 / PostgreSQL 18 smoke 확인
+3. domain / DNS 제어 확인
+4. HTTPS 종료 방식 결정
+5. 선택한 방식에 맞춰 firewall / systemd / application bind 구성
+```
+
+### Reverse Proxy 선택 시
+
+reverse proxy를 채택한다면 하나만 사용한다.
+
+```text
+Internet
+→ Reverse Proxy :80/:443
+→ 127.0.0.1:<PORT>
+→ Fastify
+```
 
 Fastify를 인터넷에 직접 노출하지 않는다.
 
-reverse proxy가 `127.0.0.1:<PORT>`로 전달한다.
+Caddy, Nginx 등 특정 구현체는 Phase 4 실행 환경을 확인한 뒤 하나를 선택한다.
 
-현재 Phase에서는 하나의 reverse proxy만 사용한다.
+선택 이유와 실제 버전을 결과 문서에 기록한다.
 
 ### Domain 전제
 
 공개적으로 신뢰되는 HTTPS 인증서를 발급하려면 사용자가 관리 가능한 domain/subdomain이 VM public IP를 가리켜야 한다.
 
-예:
-
 ```text
-hourboard.example.com → OCI VM public IPv4
+hourboard.example.com
+→ OCI VM public IPv4
 ```
 
 DNS 전파를 실제 조회로 확인한 뒤 인증서를 발급한다.
@@ -436,7 +680,7 @@ DNS 전파를 실제 조회로 확인한 뒤 인증서를 발급한다.
 
 ACME 기반 공개 인증서를 사용한다.
 
-HTTP는 HTTPS로 redirect한다.
+HTTP를 사용하는 구성이 필요하다면 HTTPS redirect를 적용한다.
 
 검증:
 
@@ -459,16 +703,23 @@ OCI network rule과 VM firewall을 함께 확인한다.
 허용:
 
 ```text
+
 22
+
 80
+
 443
+
 ```
 
 금지:
 
 ```text
+
 5432
+
 application internal port
+
 ```
 
 SSH source IP를 제한할 수 있는 환경이면 사용자의 현재 관리 환경을 차단하지 않는 범위에서 제한한다.
@@ -482,9 +733,13 @@ SSH source IP를 제한할 수 있는 환경이면 사용자의 현재 관리 �
 VM 내부에서 먼저 검증한다.
 
 ```text
-GET http://127.0.0.1:<PORT>/
-GET http://127.0.0.1:<PORT>/health
-GET http://127.0.0.1:<PORT>/api/round
+
+GET http://127.0.0.1:\<PORT>/
+
+GET http://127.0.0.1:\<PORT>/health
+
+GET http://127.0.0.1:\<PORT>/api/round
+
 ```
 
 모두 정상이어야 외부 검증으로 진행한다.
@@ -498,9 +753,13 @@ PostgreSQL 연결 실패 상태에서 외부 테스트로 넘어가지 않는다
 OCI VM 외부 환경에서 domain으로 확인한다.
 
 ```text
-GET https://<domain>/
-GET https://<domain>/health
-GET https://<domain>/api/round
+
+GET https://\<domain>/
+
+GET https://\<domain>/health
+
+GET https://\<domain>/api/round
+
 ```
 
 HTTP status와 응답 내용을 기록한다.
@@ -514,13 +773,21 @@ localhost 검증만으로 외부 배포 완료라고 판단하지 않는다.
 공개 배포 환경에서 최소 아래를 확인한다.
 
 ```text
+
 사이트 접속
+
 → 현재 전광판 표시
+
 → countdown 표시
+
 → 문구 입력
+
 → 등록
+
 → WINNER 또는 RANKED 응답
+
 → 결과 UI 표시
+
 ```
 
 ### 중요
@@ -548,17 +815,25 @@ Phase 4 목적은 배포 경로 검증이다.
 권장 외부 검증 concurrency:
 
 ```text
+
 10
+
 ```
 
 검증:
 
 ```text
+
 Winner 1명
+
 Position 연속
+
 중복 Position 0
+
 누락 Position 0
+
 Winner 문구 mutation 0
+
 ```
 
 공개 사용자 트래픽이 이미 존재하면 결과가 섞이므로 정확한 Position 검증을 수행했다고 기록하지 않는다.
@@ -572,22 +847,31 @@ Winner 문구 mutation 0
 reboot 전:
 
 ```text
+
 systemctl is-enabled hourboard
+
 systemctl status hourboard
+
 ```
 
 VM reboot 후 SSH 재접속하여 확인한다.
 
 ```text
+
 systemctl status postgresql
+
 systemctl status hourboard
+
 ```
 
 외부에서 다시 확인한다.
 
 ```text
-GET https://<domain>/health
-GET https://<domain>/
+
+GET https://\<domain>/health
+
+GET https://\<domain>/
+
 ```
 
 재부팅 후 수동 `npm start`가 필요하면 완료 실패다.
@@ -612,23 +896,22 @@ VM terminate/recreate까지의 disaster recovery는 현재 Phase 범위가 아�
 
 측정 환경을 반드시 기록한다.
 
-예:
-
 ```text
 측정 위치: 사용자 로컬 네트워크
 대상: OCI Seoul
 프로토콜: HTTPS
 측정 시각: ...
+sample 수: ...
 ```
 
 최소 측정:
 
 ```text
-GET /api/round RTT/total latency
+GET /api/round total latency
 POST /api/attempts total latency
 ```
 
-가능한 경우 여러 회 측정해 아래를 기록한다.
+가능하면 여러 회 측정해 아래를 기록한다.
 
 ```text
 p50
@@ -638,9 +921,11 @@ p99
 
 sample 수가 너무 적으면 percentile을 과장해서 해석하지 않는다.
 
-Phase 3 local baseline과 Phase 4 external 결과를 직접 동일 조건처럼 비교하지 않는다.
+Phase 3 local baseline은 Phase 4 외부 latency를 예측하는 값이 아니다.
 
-환경 차이를 명시한다.
+Phase 4 외부 결과에는 DNS, TLS, 인터넷 RTT, reverse proxy 또는 선택한 HTTPS termination 비용이 포함될 수 있다.
+
+Phase 3 local baseline과 Phase 4 external 결과를 동일 조건처럼 비교하지 않는다.
 
 ---
 
@@ -649,8 +934,11 @@ Phase 3 local baseline과 Phase 4 external 결과를 직접 동일 조건처럼 
 결과 문서에서 최소 아래를 구분한다.
 
 ```text
+
 Phase 3 local baseline
+
 Phase 4 external RTT 포함 latency
+
 ```
 
 외부 latency 증가분을 서버 처리 시간이라고 단정하지 않는다.
@@ -666,13 +954,21 @@ Phase 4 완료 판정에는 실제 사용자 화면 접근 확인이 포함된�
 브라우저 실행 capability가 있는 경우 실제 browser로 아래를 확인한다.
 
 ```text
+
 HTTPS 정상 표시
+
 현재 전광판
+
 countdown
+
 문구 입력
+
 등록 버튼
+
 WINNER/RANKED 결과
+
 모바일 viewport 핵심 흐름
+
 ```
 
 브라우저 capability가 없는 환경에서는 HTTP 검증만으로 시각적 UI를 검증했다고 기록하지 않는다.
@@ -683,7 +979,35 @@ WINNER/RANKED 결과
 
 ---
 
-## 26. 로그 검증
+## 26. 운영 로그 및 오류 진단 검증
+
+현재 코드에서 Fastify logger가 비활성화되어 있거나 내부 오류 원인이 외부 응답에서 숨겨지는 경로가 있다면, Phase 4 배포 전에 **production에서만 최소 구조화 오류 로그**를 검토한다.
+
+목적은 운영 장애 원인 확인이며 요청 전체를 기록하는 것이 아니다.
+
+최소 기록 후보:
+
+```text
+timestamp
+route
+HTTP status
+internal error category
+request correlation id가 이미 존재하면 해당 값
+```
+
+기록 금지:
+
+```text
+DATABASE_URL 전체 값
+DB password
+환경 변수 전체 dump
+사용자 문구 전문
+SSH key
+OCI credential
+TLS private key
+```
+
+외부 HTTP 응답에 stack trace를 노출하지 않는다.
 
 systemd journal에서 application startup과 요청 처리 중 치명 오류가 없는지 확인한다.
 
@@ -691,16 +1015,9 @@ systemd journal에서 application startup과 요청 처리 중 치명 오류가 
 journalctl -u hourboard
 ```
 
-production 로그에 아래가 출력되지 않아야 한다.
+내부 journal에 운영 진단용 stack trace가 남는 것은 허용할 수 있지만 비밀값 또는 사용자 입력 전문이 포함되지 않는지 확인한다.
 
-```text
-DATABASE_URL 전체 값
-DB password
-환경 변수 전체 dump
-stack trace가 포함된 사용자 응답
-```
-
-내부 journal에 예외 stack trace가 남는 것은 가능하지만 사용자 HTTP 응답에는 노출하지 않는다.
+새로운 외부 logging SaaS는 도입하지 않는다.
 
 ---
 
@@ -711,47 +1028,68 @@ stack trace가 포함된 사용자 응답
 권장:
 
 ```text
+
 docs/results/artifacts/phase4/
+
 ├─ deployment-summary.json
+
 ├─ external-smoke.json
+
 ├─ reboot-recovery.json
+
 ├─ network-check.json
+
 └─ latency-summary.json
+
 ```
 
 절대 포함하지 않음:
 
 ```text
+
 SSH private key
+
 DB password
+
 full DATABASE_URL
+
 OCI secret/auth token
+
 TLS private key
+
 ```
 
 ---
 
 ## 28. deployment-summary.json
 
-최소 예시:
+최소 구조:
 
 ```json
 {
   "region": "ap-seoul-1",
-  "shape": "VM.Standard.A1.Flex",
-  "ocpus": 2,
-  "memoryGb": 12,
+  "shape": "...",
+  "ocpus": null,
+  "memoryGb": null,
+  "alwaysFreeEligible": true,
+  "linuxImage": "...",
+  "httpsTermination": "...",
   "nodeVersion": "...",
   "postgresVersion": "...",
   "https": true,
   "postgresPubliclyReachable": false,
+  "applicationPortPubliclyReachable": false,
   "systemdEnabled": true,
   "rebootRecovery": true,
   "deployedCommit": "..."
 }
 ```
 
-실제 확인한 값만 기록한다.
+OCPU, memory, shape은 실제 OCI Console에서 무료로 확인한 값을 기록한다.
+
+문서의 과거 예시 숫자를 실제 배포값으로 복사하지 않는다.
+
+실제로 확인한 값만 기록한다.
 
 ---
 
@@ -762,23 +1100,42 @@ TLS private key
 최소 포함:
 
 ```text
-OCI account/home region 확인 결과
+배포 commit
+
+Local Pre-Deployment Gate
+- #13 원격 Winner / 10초 Window UI 동기화 결과
+- #19 /api/round 정각 경계 결과
+- #20 사전 판정 / DB 최종 판정 경계 결과
+- 실제 수정 여부
+
+OCI account / home region 확인 결과
+실제 Free eligibility / quota 확인 방법
 생성한 무료 리소스
 VM shape / OCPU / memory
-OS
+OS / Linux image
 Node.js version
 PostgreSQL version
-배포 commit
+
+migration 결과
+hour_slots schema metadata 대조 결과
+
 network 구성
 PostgreSQL localhost 검증
+application internal port 외부 차단
 systemd 구성
-HTTPS 구성
+운영 EnvironmentFile 구성
+production .env fallback 처리
+HTTPS 종료 방식 / 구현체
+운영 로그 구성
+
 외부 smoke test
 외부 사용자 흐름 검증
 외부 concurrency invariant
 reboot recovery
-외부 RTT/latency
+외부 RTT / latency
 Phase 3 baseline과 차이
+browser 검증 결과
+
 artifact 경로
 미검증 항목
 운영 제한사항
@@ -787,6 +1144,8 @@ artifact 경로
 IP, domain은 공개 가능한 경우만 문서화한다.
 
 credential은 기록하지 않는다.
+
+검증되지 않은 항목을 성공으로 표현하지 않는다.
 
 ---
 
@@ -797,10 +1156,15 @@ credential은 기록하지 않는다.
 최소 기록:
 
 ```text
+
 Always Free capacity 부족 가능
+
 Always Free inactive Compute reclaim 가능성
+
 home region 제약
+
 무료 quota 범위
+
 ```
 
 Always Free VM은 조건에 따라 Oracle이 idle instance로 판단해 회수할 수 있으므로 운영 안정성을 유료 SLA처럼 표현하지 않는다.
@@ -814,7 +1178,7 @@ Phase 4가 실제 완료된 경우에만 README 상태를 갱신한다.
 ```text
 Phase 1 — Concurrency Core: 완료
 Phase 2 — Ticketing UI: 완료
-Phase 3 — Load & Race Verification: 완료
+Phase 3 — Load, Race & Open-State Verification: 완료
 Phase 4 — OCI Deployment: 완료
 ```
 
@@ -824,6 +1188,8 @@ README에 실제 production credential이나 server secret을 넣지 않는다.
 
 운영 실행 방법은 실제 배포 방법과 일치해야 한다.
 
+Phase 4가 blocker로 부분 완료된 경우 README에 완료라고 쓰지 않는다.
+
 ---
 
 ## 32. 완료 기준
@@ -831,42 +1197,75 @@ README에 실제 production credential이나 server secret을 넣지 않는다.
 아래를 모두 확인한다.
 
 ```text
+[ ] docs/codebase-assumptions-review.md 확인
+
+[ ] Local Gate #13 UI 동기화 검증
+[ ] Local Gate #19 /api/round 정각 경계 검증
+[ ] Local Gate #20 사전/최종 판정 경계 검증
+[ ] 필요한 경우 최소 수정 후 build / E2E 통과
+
 [ ] OCI home region = Seoul 확인
-[ ] Always Free eligible resource 확인
+[ ] 현재 계정의 Free eligibility / quota 확인
 [ ] 유료 resource 생성 없음
 [ ] OCI Compute 생성
 [ ] VM SSH 접속
+
+[ ] Linux image 기록
 [ ] Node.js 24 LTS 설치 및 버전 확인
 [ ] PostgreSQL 18.x 설치 및 버전 확인
 [ ] production DB/user 생성
+
 [ ] migration 성공
+[ ] hour_slots schema metadata 대조
 [ ] application build 성공
+
+[ ] production EnvironmentFile 생성
+[ ] 저장소 .env 자동 fallback에 의존하지 않음
 [ ] systemd service 실행
 [ ] systemd enable 완료
+[ ] PostgreSQL 기동 의존 관계 확인
+[ ] systemd restart smoke test
+
+[ ] HTTPS 종료 방식 확정
 [ ] Fastify external direct port 비공개
 [ ] PostgreSQL localhost-only
 [ ] OCI inbound 5432 없음
 [ ] 외부 5432 접근 실패 확인
+[ ] application internal port 외부 접근 실패 확인
+
 [ ] domain DNS 정상
 [ ] HTTPS 인증서 정상
-[ ] HTTP → HTTPS redirect
+[ ] HTTP → HTTPS redirect 또는 선택한 HTTPS 정책 정상
+
 [ ] 외부 GET / 200
 [ ] 외부 GET /health 정상
 [ ] 외부 GET /api/round 정상
 [ ] 외부 등록 흐름 정상
 [ ] 배포 환경 concurrency invariant 확인
+[ ] 10초 Registration Window 외부 검증
+
+[ ] production 최소 오류 로그 검증
+[ ] secret / 사용자 문구 전문 로그 미노출
+
 [ ] VM reboot 수행
 [ ] reboot 후 PostgreSQL 자동 복구
 [ ] reboot 후 HourBoard 자동 복구
 [ ] reboot 후 HTTPS 접근 정상
+[ ] reboot 전후 DB 데이터 지속
+
 [ ] 외부 RTT 기록
-[ ] 등록 latency 기록
+[ ] 등록 latency p50 / p95 / p99 또는 실제 가능한 통계 기록
+[ ] sample 수 기록
+[ ] 실제 브라우저 핵심 흐름 확인
+
 [ ] Phase 4 artifact 생성
 [ ] docs/results/phase4-oci-deployment.md 생성
 [ ] README 실제 상태 갱신
 ```
 
-브라우저 시각 검증 capability가 없다면 해당 항목은 미검증으로 남기고 Phase 4를 완전 완료라고 보고하지 않는다.
+브라우저 검증 capability가 없는 환경에서는 시각적 UI 항목을 미검증으로 남긴다.
+
+domain, OCI 인증, Free eligibility 등 필수 전제가 충족되지 않으면 거짓 완료 처리하지 않는다.
 
 ---
 
@@ -875,23 +1274,26 @@ README에 실제 production credential이나 server secret을 넣지 않는다.
 아래 상황에서 거짓 완료 처리하지 않는다.
 
 ```text
+Local Gate에서 핵심 UI/정각 경계 오류가 재현됐지만 수정·재검증하지 못함
 OCI home region이 Seoul이 아님
-Always Free capacity 없음
-Always Free 여부 확인 불가
+현재 계정의 Free eligibility 확인 불가
+무료 capacity 없음
 OCI 인증 정보 없음
 SSH 접속 불가
+선택한 Linux image에서 Node.js 24 또는 PostgreSQL 18 설치 불가
 Domain 없음
 DNS 변경 불가
 HTTPS 인증서 발급 실패
 PostgreSQL 18 설치 실패
 외부 5432 차단 확인 실패
-reboot 후 자동 복구 실패
+application internal port 외부 차단 확인 실패
+systemd reboot recovery 실패
 브라우저 검증 요구사항 미충족
 ```
 
 가능한 범위까지 작업하고 정확한 blocker와 이어서 할 작업을 기록한다.
 
-유료 resource로 우회하지 않는다.
+유료 resource, 다른 region, managed database 등으로 자동 우회하지 않는다.
 
 ---
 
@@ -900,13 +1302,17 @@ reboot 후 자동 복구 실패
 작업 시작 전:
 
 ```text
+
 git status
+
 ```
 
 Phase 4 완료 후 commit:
 
 ```text
+
 feat: phase4-oci-deployment
+
 ```
 
 운영 credential, private key, secret env file을 commit하지 않는다.
@@ -920,21 +1326,37 @@ feat: phase4-oci-deployment
 이번 Phase에서는 아래를 구현하지 않는다.
 
 ```text
+
 멀티 VM
+
 Load Balancer
+
 Auto Scaling
+
 Redis
+
 Queue
+
 Managed PostgreSQL
+
 Terraform
+
 Ansible
+
 CI/CD
+
 Blue/Green deployment
+
 Zero-downtime deployment
+
 자동 DB backup 정책
+
 모니터링 SaaS
+
 Pager/alerting
+
 로그 수집 SaaS
+
 ```
 
 운영상 필요하더라도 이후 Phase로 분리한다.
@@ -947,51 +1369,72 @@ Pager/alerting
 
 ```text
 ## 작업 상태
-- Phase 4 완료 / 부분 완료
+- Phase 4 완료 / 부분 완료 / blocker
+
+## Local Pre-Deployment Gate
+- #13 UI 동기화 검증
+- #19 /api/round 정각 경계
+- #20 사전/최종 판정 경계
+- 코드 수정 여부
 
 ## OCI
 - home region
 - region
 - shape
 - OCPU / memory
-- Always Free 확인 상태
+- Free eligibility 확인 방식
 
 ## Runtime
-- OS
+- OS / Linux image
+- architecture
 - Node.js
 - PostgreSQL
 
 ## Network
-- HTTPS
+- HTTPS termination
+- reverse proxy 사용 여부 / 구현체
 - open ports
+- application internal port external access
 - PostgreSQL external access
 
 ## Deployment
 - deployed commit
-- systemd
 - migration
+- schema metadata
+- EnvironmentFile
+- production .env fallback 처리
+- systemd
+- structured error logging
 
 ## External E2E
-- / 
+- /
 - /health
 - /api/round
 - registration
+- 10초 Registration Window
 - concurrency invariant
+- browser 확인
 
 ## Reboot
 - PostgreSQL recovery
 - application recovery
 - HTTPS recovery
+- DB data persistence
 
 ## Performance
-- RTT
-- registration latency
+- 측정 위치
+- sample 수
+- GET /api/round latency
+- registration p50 / p95 / p99
+- Phase 3 local baseline과의 환경 차이
 
 ## Artifact
-- actual paths
+- 실제 경로
 
 ## 제한사항
-- 확인된 사실만
+- 확인된 사실
+- 미검증 항목
+- blocker
 
 ## Git
 - commit hash
@@ -1007,7 +1450,23 @@ Pager/alerting
 
 추가 계획 확인 없이 Phase 4 범위 안에서 작업을 시작한다.
 
-**OCI home region과 Always Free eligibility를 먼저 검증하고, 유료 리소스를 생성하지 않는 조건에서 Seoul Compute 1대에 Node.js 24 LTS + PostgreSQL 18 + HourBoard를 배포한다. PostgreSQL은 localhost로 제한하고, HTTPS reverse proxy와 systemd 자동 시작을 구성한다. 외부 HTTPS E2E, 핵심 동시성 invariant, VM reboot recovery, 실제 외부 RTT/등록 latency를 검증하고 반복 가능한 artifact와 결과 문서를 남긴 뒤 Phase 4 commit을 생성한다.**
+먼저 `docs/codebase-assumptions-review.md`를 읽고 Local Pre-Deployment Gate를 수행한다.
+
+**#13 원격 Winner / 10초 Window UI 동기화, #19 `/api/round` 정각 경계, #20 Node 사전 판정과 PostgreSQL 최종 판정 경계를 먼저 검증한다. 실제 문제가 재현되지 않으면 코드를 바꾸지 말고, 재현된 경우에만 가장 좁은 수정안을 적용한 뒤 build와 E2E를 다시 통과시킨다.**
+
+그 다음 OCI 계정의 home region, 현재 계정에서 실제로 확인되는 Free eligibility / quota, SSH, domain/DNS 조건을 확인한다. 문서에 적힌 과거 무료 사양 숫자만 근거로 리소스를 생성하지 않는다.
+
+무료 조건이 확인되는 경우에만 Seoul Compute 1대를 생성한다.
+
+VM image를 확정한 뒤 해당 architecture에서 Node.js 24 LTS와 PostgreSQL 18 설치·빌드·migration을 smoke 확인하고 HTTPS 종료 방식을 결정한다. reverse proxy를 채택하는 경우 Fastify는 loopback bind를 유지하고 proxy만 외부에 노출한다.
+
+운영 환경 변수는 systemd가 명시적으로 읽는 별도 `EnvironmentFile`로 주입하고 저장소 `.env` 자동 fallback에 의존하지 않는다.
+
+PostgreSQL은 localhost로 제한하고, migration 직후 `hour_slots` schema metadata를 대조한다. production에서만 최소 구조화 오류 로그를 적용하되 credential, 환경 변수 전체, 사용자 문구 전문을 기록하지 않는다.
+
+외부 HTTPS E2E, 10초 Registration Window, 핵심 동시성 invariant, application/DB 포트 차단, VM reboot recovery, 데이터 지속성, 실제 브라우저 흐름, 외부 RTT와 등록 latency를 검증한다.
+
+실제 측정값과 확인된 사실만 artifact와 결과 문서에 기록하고 Phase 4 commit을 생성한다.
 
 무료 조건, domain, OCI 인증, browser capability 등 필수 전제가 충족되지 않으면 거짓 완료 처리하지 말고 정확한 blocker와 이어서 할 작업을 기록한다.
 
