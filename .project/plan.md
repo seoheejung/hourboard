@@ -432,9 +432,9 @@ hourboard/
 
 Phase 1과 Phase 2 MVP 구현 및 이후 확인된 수정 사항은 적용 완료된 상태를 기준으로 한다.
 
-이 문서에서 앞으로 구현 대상으로 관리하는 범위는 **Phase 3과 Phase 4**다.
+이 문서에서 앞으로 구현 대상으로 관리하는 범위는 **Phase 4**다.
 
-Phase 1·2의 실제 구현 사실과 검증 이력은 `docs/results/*`를 우선하며, Phase 3·4에서 기존 동작을 임의로 되돌리거나 재설계하지 않는다.
+Phase 1·2·3의 실제 구현 사실과 검증 이력은 `docs/results/*`를 우선하며, Phase 4에서 기존 동작을 임의로 되돌리거나 재설계하지 않는다.
 
 ---
 
@@ -472,117 +472,22 @@ Phase 3에서 위 기능을 다시 설계하지 않는다.
 
 ### Phase 3 — Load, Race & Open-State Verification
 
-**상태: 다음 작업**
+**상태: 완료**
 
-목적은 현재 MVP의 동시성 정합성을 유지하면서 등록 race, 정각 open-state 전달 방식, polling/cache 효과, Thundering Herd를 실제 측정하는 것이다.
-
-세부 구현 기준은 `docs/instructions/phase3-load-race-verification.md`를 따른다.
-
-#### 3A. Registration Race
-
-범위:
-
-- Phase 3 전용 PostgreSQL load-test database
-- k6 및 Node.js 기반 race 검증
-- concurrency 10 / 50 / 100 / 200
-- 첫 등록 후 10초 Registration Window 유지
-- `requested / accepted / registrationClosed / unexpectedFailed` 분리
-- p50 / p95 / p99
-- RPS
-- acceptance rate
-- 예상하지 못한 오류율
-- PostgreSQL `pg_stat_activity`, `pg_locks` 기반 contention 관찰
-- Winner / Position 정합성 자동 검증
-- 반복 가능한 결과 아티팩트
-
-accepted 요청 수를 `S`라고 할 때:
-```text
-S >= 1
-winner count among accepted = 1
-positions among accepted = 1..S
-duplicate position = 0
-missing position = 0
-winner message mutation = 0
-```
-`REGISTRATION_CLOSED` 요청은 Position을 소비하지 않아야 한다.
-
-#### 3B. Open-State Delivery
-
-정각과 Registration Window 상태를 브라우저에 전달하는 세 방식을 비교한다.
-```text
-Mode A — Client Timer
-Mode B — Direct Polling
-Mode C — Cached Polling
-```
-범위:
-
-- `GET /api/open-state`
-- Client Timer baseline
-- Direct Polling
-- Phase 3 전용 local shared-cache proxy
-- Cached Polling
-- polling client 100 / 500 / 1000
-- client request count
-- origin request count
-- cache hit / miss
-- cache suppression ratio
-- p50 / p95 / p99
-- open-state detection delay
-
-`GET /api/open-state`는 UI 상태 전달용이다. 최종 등록 허용 여부는 항상 `POST /api/attempts`와 PostgreSQL이 판정한다.
-
-Cached Polling 실험은 실제 CDN이 아니라 **local shared-cache simulation**으로 기록한다.
-
-Redis는 도입하지 않는다.
-
-#### 3C. Thundering Herd
-
-범위:
-
-- concurrency 10 / 50 / 100 / 200
-- 공통 barrier를 이용한 순간 POST 집중
-- dispatch spread
-- p50 / p95 / p99
-- RPS
-- accepted / registrationClosed / unexpectedFailed
-- connection pool 대기 징후
-- PostgreSQL lock contention
-- Winner / Position 정합성
-
-실제 매시 정각을 기다리는 방식만 사용하지 않고 반복 가능한 synthetic barrier를 기준 baseline으로 사용한다.
-
-#### Phase 3 완료 기준
-
-- 기존 MVP build / E2E 재통과
-- 10초 Registration Window 정합성 유지
-- Registration Race 10 / 50 / 100 / 200 결과 존재
-- 각 race 단계 accepted Winner 1명
-- accepted Position `1..S`
-- 중복 Position 0
-- 누락 Position 0
-- Winner 문구 mutation 0
-- `REGISTRATION_CLOSED`가 Position을 소비하지 않음
-- Client Timer baseline 존재
-- Direct Polling 100 / 500 / 1000 결과 존재
-- Cached Polling 100 / 500 / 1000 결과 존재
-- client request / origin request 분리 측정
-- cache hit / miss 및 suppression ratio 기록
-- open-state detection delay 기록
-- Thundering Herd 10 / 50 / 100 / 200 결과 존재
-- dispatch spread 기록
-- PostgreSQL contention snapshot 존재
-- 측정값으로 확인된 병목과 확인하지 못한 원인을 구분
-- `k6/results/phase3/`에 반복 가능한 아티팩트 생성
-- `docs/results/phase3-load-race-verification.md` 작성
-- README에 실제 Phase 3 상태 반영
-
-Phase 3은 baseline 생성 단계다. 임의 p95/RPS 목표를 pass/fail 기준으로 만들지 않는다.
+- Registration Race 10 / 50 / 100 / 200 검증 완료
+- 10초 Registration Window 정합성 검증 완료
+- Client Timer / Direct Polling / Cached Polling 비교 완료
+- local shared-cache simulation 완료
+- Thundering Herd 검증 완료
+- PostgreSQL contention 측정 완료
+- baseline artifact 생성 완료
+- 결과: `docs/results/phase3-load-race-verification.md`
 
 ### Phase 4 — OCI Deployment
 
-**상태: 예정**
+**상태: 다음 작업**
 
-Phase 3 로컬 baseline을 확보한 뒤 실제 외부 환경에서 배포·복구·보안·latency를 검증한다.
+Phase 3 로컬 baseline을 수정하지 않고 비교 기준으로 사용한다. 실제 외부 환경에서 배포·복구·보안·latency를 검증한다.
 
 세부 구현 기준은 `docs/instructions/phase4-oci-deployment.md`를 따른다.
 
@@ -622,7 +527,7 @@ Phase 3 로컬 baseline을 확보한 뒤 실제 외부 환경에서 배포·복�
 
 ## 15. 현재 단계에서 구현하지 않는 확장안
 
-Phase 3·4에서 아래 기능을 선반영하지 않는다.
+Phase 4에서 아래 기능을 선반영하지 않는다.
 
 - Redis atomic counter
 - Redis 기반 open-state cache
