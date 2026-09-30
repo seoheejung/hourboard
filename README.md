@@ -224,20 +224,37 @@ flowchart LR
 flowchart LR
     Browser -->|HTTPS| DuckDNS[hourboard.duckdns.org]
     DuckDNS --> Router[Home Router\nTCP 443]
-    Router --> Traefik[Traefik\nMini PC]
+    Router --> Traefik[Traefik\nEcoBe-A1 Mini PC]
     Traefik --> Fastify[Fastify API + Static Web]
     Fastify --> PostgreSQL[(PostgreSQL)]
 ```
 
-운영 경로는 **DuckDNS → 가정망 TCP 443 직접 인바운드 → Traefik → Fastify → PostgreSQL** 구조다.
+Phase 4B는 EcoBe-A1 Mini PC를 실제 운영 호스트로 사용한다.
 
-- Traefik만 host TCP `443`을 공개한다.
-- Fastify `3000`은 Docker 내부에서만 사용한다.
-- PostgreSQL `5432`는 외부에 공개하지 않는다.
-- Traefik과 Fastify는 `edge` network를 공유한다.
-- Fastify와 PostgreSQL은 `data` network를 공유한다.
-- HTTPS 인증서는 Let's Encrypt DNS-01과 DuckDNS를 사용한다.
-- TCP `80`은 Phase 4B 기본 운영 경로에서 열지 않는다.
+- Host OS: Windows 11
+- Linux Environment: WSL2 Ubuntu
+- Container Runtime: Docker Desktop
+- Reverse Proxy: Traefik
+- Public Hostname: `hourboard.duckdns.org`
+- HTTPS: Let's Encrypt DNS-01
+- Dynamic DNS: DuckDNS
+- 외부 공개 포트: TCP `443`
+- Fastify `3000`, PostgreSQL `5432`는 Docker 내부에서만 사용
+
+운영 경로:
+
+```text
+hourboard.duckdns.org
+→ 가정망 공인 IPv4
+→ 공유기 TCP 443
+→ EcoBe-A1 Mini PC
+→ Docker Desktop
+→ Traefik
+→ Fastify
+→ PostgreSQL
+```
+
+현재 미니PC에서 Windows 11, WSL2 Ubuntu, Docker Desktop Linux Engine, x86_64 환경과 충분한 저장 공간을 확인했다. 현재 TCP 80/443/3000/5432 listener와 실행 중인 Docker 컨테이너가 없는 상태에서 Phase 4B 배포를 준비하고 있다.
 
 ### Phase 4A OCI 시도
 
@@ -268,9 +285,7 @@ OCI Japan East (Tokyo) A1 Flex를 무료 배포 후보로 검증했으나 Comput
 
 ---
 
-## 환경 변수 및 민감정보
-
-### 애플리케이션 환경 변수
+## 환경 변수
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
@@ -289,18 +304,6 @@ DATABASE_URL=postgresql://hourboard:hourboard@localhost:5432/hourboard
 ```
 
 운영 환경에서는 별도의 PostgreSQL 계정과 비밀번호를 사용하며 기본 비밀번호를 코드에 포함하지 않는다.
-
-### 저장소 민감정보 기준
-
-- 비밀값 코드 하드코딩 금지
-- 운영 credential과 token을 코드, 문서, 로그, 테스트 아티팩트에 기록하지 않음
-- 실제 공인 IPv4, 내부 LAN IPv4, MAC address, Windows 사용자명·홈 경로를 저장소 문서에 기록하지 않음
-- 공유기 관리자 credential, DuckDNS token, DB password, production `DATABASE_URL`, 인증서 private key 커밋 금지
-- 문서와 설정 예시는 실제 값 대신 `<MINIPC_LAN_IP>`, `<PUBLIC_IP>`, `<DUCKDNS_TOKEN>` 같은 placeholder 사용
-- 운영 확인 결과는 필요한 경우 성공·실패 여부와 상태만 기록하고 실제 민감값은 기록하지 않음
-- production은 저장소 `.env` fallback에 의존하지 않음
-
-Phase 4B 운영 설정에는 애플리케이션 변수 외에 PostgreSQL credential과 `DUCKDNS_TOKEN`이 필요하지만 실제 값은 저장소 외부에서 주입한다.
 
 ---
 
@@ -477,6 +480,18 @@ Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, �
 
 현재 기본 배포 경로다.
 
+물리 환경:
+
+| 항목 | 내용 |
+| --- | --- |
+| 장비 | EcoBe-A1 Mini PC |
+| CPU | Intel N100 |
+| Core / Thread | 4C / 4T |
+| Memory | 16GB |
+| Host OS | Windows 11 |
+| Linux Environment | WSL2 Ubuntu |
+| Container Runtime | Docker Desktop |
+
 사전 확인 완료:
 
 - 공유기 WAN IPv4와 외부 관측 IPv4 일치
@@ -487,13 +502,13 @@ Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, �
 - 운영 배포에 충분한 저장 공간 확인
 - 현재 실행 중 Docker 컨테이너 없음
 - 현재 TCP 80/443/3000/5432 listener 없음
+- Phase 4B 운영 구성 작성 및 작업 PC 정적 검증 완료
+- 운영 구성 커밋 및 `origin/main` 반영 완료
 
 남은 검증:
 
-- `compose.prod.yaml`
-- Traefik
-- Fastify production bind
-- PostgreSQL production volume
+- 미니PC에서 운영 Compose 실제 build
+- PostgreSQL / Fastify / Traefik 실제 기동
 - DuckDNS updater
 - Let's Encrypt DNS-01
 - 공유기 TCP 443 포트포워딩
@@ -517,6 +532,8 @@ hourboard/
 │  └─ plan.md
 ├─ db/
 │  └─ migrations/
+├─ deploy/
+│  └─ production.env.example
 ├─ docs/
 │  ├─ instructions/
 │  ├─ progress/
@@ -539,13 +556,13 @@ hourboard/
 │  └─ results/
 ├─ .env.example
 ├─ compose.yaml
+├─ compose.prod.yaml
+├─ Dockerfile.prod
 ├─ .gitignore
 ├─ AGENTS.md
 ├─ DESIGN.md
 └─ README.md
 ```
-
-Phase 4B 구현 시 운영 Compose 파일은 개발용 `compose.yaml`과 분리한다.
 
 ---
 
@@ -561,29 +578,3 @@ Phase 4B 구현 시 운영 Compose 파일은 개발용 `compose.yaml`과 분리�
 | `docs/results/*` | 완료된 구현·검증 결과 |
 | `docs/instructions/phase4-self-hosted-deployment.md` | Phase 4B 미니PC 배포·검증 지침 |
 | `docs/progress/phase4-oci-deployment.md` | OCI Phase 4A 시도와 capacity 결과 |
-
----
-
-## 현재 배포 경로
-
-```text
-hourboard.duckdns.org
-        ↓
-DuckDNS
-        ↓
-가정망 공인 IPv4
-        ↓
-공유기 TCP 443
-        ↓
-EcoBe-A1 Mini PC
-        ↓
-Docker Desktop
-        ↓
-Traefik
-        ↓
-Fastify
-        ↓
-PostgreSQL
-```
-
-실제 공인 IPv4, 미니PC LAN IPv4, 운영 credential은 저장소에 기록하지 않는다.
