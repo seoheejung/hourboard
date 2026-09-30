@@ -9,19 +9,17 @@ services:
       - --providers.docker.exposedbydefault=false
       - --providers.docker.network=hourboard-prod_edge
       - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.duckdns.acme.email=${ACME_EMAIL:?Set ACME_EMAIL in the external production environment file}
+      - --certificatesresolvers.duckdns.acme.email=${ACME_EMAIL:?Set ACME_EMAIL in deploy/production.env}
       - --certificatesresolvers.duckdns.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.duckdns.acme.dnschallenge=true
       - --certificatesresolvers.duckdns.acme.dnschallenge.provider=duckdns
     environment:
-      DUCKDNS_TOKEN_FILE: /run/secrets/duckdns_token
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?Set DUCKDNS_TOKEN in deploy/production.env}
     ports:
       - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik_acme:/letsencrypt
-    secrets:
-      - duckdns_token
     networks:
       - edge
 
@@ -31,9 +29,7 @@ services:
     environment:
       POSTGRES_DB: hourboard
       POSTGRES_USER: hourboard
-      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
-    secrets:
-      - db_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/production.env}
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
@@ -54,9 +50,7 @@ services:
       DATABASE_HOST: db
       DATABASE_USER: hourboard
       DATABASE_NAME: hourboard
-      DATABASE_PASSWORD_FILE: /run/secrets/db_password
-    secrets:
-      - db_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/production.env}
     depends_on:
       db:
         condition: service_healthy
@@ -70,8 +64,6 @@ services:
     image: hourboard:phase4b
     restart: unless-stopped
     environment: *app_environment
-    secrets:
-      - db_password
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -92,10 +84,8 @@ services:
     restart: unless-stopped
     environment:
       DUCKDNS_DOMAIN: hourboard
-      DUCKDNS_TOKEN_FILE: /run/secrets/duckdns_token
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?Set DUCKDNS_TOKEN in deploy/production.env}
       DUCKDNS_INTERVAL_SECONDS: "300"
-    secrets:
-      - duckdns_token
     networks:
       - ddns
 
@@ -111,9 +101,3 @@ networks:
 volumes:
   postgres_data:
   traefik_acme:
-
-secrets:
-  db_password:
-    file: ${HOURBOARD_SECRET_DIR:?Set HOURBOARD_SECRET_DIR in the external production environment file}/db_password
-  duckdns_token:
-    file: ${HOURBOARD_SECRET_DIR:?Set HOURBOARD_SECRET_DIR in the external production environment file}/duckdns_token

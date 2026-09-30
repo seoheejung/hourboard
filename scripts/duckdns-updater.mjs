@@ -1,16 +1,12 @@
-import { readFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const domain = process.env.DUCKDNS_DOMAIN;
-const tokenFile = process.env.DUCKDNS_TOKEN_FILE;
+const token = process.env.DUCKDNS_TOKEN;
 const intervalSeconds = Number(process.env.DUCKDNS_INTERVAL_SECONDS);
-if (!domain || !/^[a-z0-9-]+$/.test(domain) || !tokenFile ||
+if (!domain || !/^[a-z0-9-]+$/.test(domain) || !token ||
     !Number.isInteger(intervalSeconds) || intervalSeconds < 60) {
   throw new Error('DuckDNS updater configuration is invalid');
 }
-
-const token = (await readFile(tokenFile, 'utf8')).replace(/\r?\n$/, '');
-if (!token) throw new Error('DuckDNS token is empty');
 
 const endpoint = new URL('https://www.duckdns.org/update');
 endpoint.searchParams.set('domains', domain);

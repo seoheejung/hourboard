@@ -249,7 +249,7 @@ Traefik은 DuckDNS provider를 이용한 Let's Encrypt DNS-01로 `hourboard.duck
 
 - DNS-01 사용
 - TCP 80 불필요
-- DuckDNS 토큰 비밀 파일을 `DUCKDNS_TOKEN_FILE`로 Traefik에 주입
+- `deploy/production.env`의 `DUCKDNS_TOKEN`을 Traefik에 주입
 - ACME 저장소 영속화
 - Traefik image는 확인한 stable tag로 고정
 - `latest` 사용 금지
@@ -259,16 +259,15 @@ Traefik은 DuckDNS provider를 이용한 Let's Encrypt DNS-01로 `hourboard.duck
 
 ## 5. 운영 비밀값
 
-운영 비밀값은 저장소와 분리한다.
-
-운영 비밀값은 미니PC의 저장소 밖 파일 두 개에 둔다. Docker Compose secret으로 컨테이너에 읽기 전용 주입한다.
+운영 비밀값은 Git 추적에서 제외된 `deploy/production.env` 한 파일에서 관리한다. 파일에는 다음 세 값만 둔다.
 
 ```text
-db_password     → PostgreSQL과 Fastify 공유
-duckdns_token   → Traefik과 DuckDNS updater 공유
+ACME_EMAIL       → Traefik ACME 연락처
+POSTGRES_PASSWORD → PostgreSQL과 Fastify 공유
+DUCKDNS_TOKEN    → Traefik과 DuckDNS updater 공유
 ```
 
-`deploy/production.env.example`은 Git에 올리는 빈 예시이며 실제 `production.env`는 작업 PC에 생성하지 않는다. 미니PC에서 예시를 참고해 저장소 밖 `C:/ProgramData/HourBoard/production.env`를 만들고 실제 연락 이메일 `ACME_EMAIL`과 비밀 파일의 공통 디렉터리 `HOURBOARD_SECRET_DIR`을 지정한다. 예시의 빈 값은 Compose 검사를 통과하지 못한다. 저장소 안에 실수로 `production.env`를 만들더라도 `.gitignore`에서 제외한다. `HOURBOARD_SECRET_DIR` 아래의 `db_password`, `duckdns_token` 파일에는 각각 비밀번호와 토큰 값만 UTF-8 BOM·줄바꿈 없이 저장한다. 비밀값을 CLI 인수나 Compose 환경 변수 값으로 직접 전달하지 않는다. Fastify는 DB 암호 파일과 비밀값이 아닌 DB host/user/name으로 URL을 만들며 production에서 저장소 `.env` fallback을 사용하지 않는다. 로컬 개발용 `.env`에는 DuckDNS 토큰을 추가하지 않는다.
+`deploy/production.env.example`은 세 key의 빈 예시만 Git에 올린다. 미니PC에서는 저장소의 `deploy/production.env`에 실제 값을 입력한다. 이 파일은 `.gitignore` 대상이며 Docker 빌드 컨텍스트에서도 제외된다. 세 값 중 하나라도 비어 있으면 Compose 구성이 실패한다. 비밀값은 Compose가 컨테이너 환경 변수로 전달하고 Fastify는 `POSTGRES_PASSWORD`와 비밀값이 아닌 DB host/user/name으로 연결 URL을 만든다. `docker compose config`의 전체 출력에는 환경 변수 값이 나타날 수 있으므로 운영 환경에서는 `config --quiet`만 사용한다. production에서 저장소 `.env` fallback을 사용하지 않으며 로컬 개발용 `.env`에는 DuckDNS 토큰을 추가하지 않는다.
 
 금지:
 
@@ -321,7 +320,7 @@ Windows 방화벽에서도 TCP 443만 필요한 범위로 허용한다.
 3. `edge` / `data` network 분리
 4. Fastify production bind 수정
 5. PostgreSQL named volume 구성
-6. 운영 secret 주입 경로 구성
+6. Git에서 제외되는 운영 `deploy/production.env` 주입 경로 구성
 7. stable image version 확인 및 고정
 8. build 및 기존 E2E 실행
 9. `git diff --check`
@@ -330,14 +329,14 @@ Windows 방화벽에서도 TCP 443만 필요한 범위로 허용한다.
 ### 미니PC
 
 1. 저장소 또는 배포 아티팩트를 미니PC에 배치한다.
-2. 저장소 밖에 운영 설정 파일과 비밀 디렉터리를 만든다. `production.env`에는 실제 `ACME_EMAIL`과 `HOURBOARD_SECRET_DIR`만 설정하고, 그 디렉터리에 `db_password`, `duckdns_token` 파일을 둔다. 토큰·암호의 실제 값은 저장소, 채팅, 명령 인수에 쓰지 않는다.
-3. 배포 디렉터리의 PowerShell에서 다음 명령을 순서대로 실행한다. 실제 운영 설정 파일 경로를 사용한다.
+2. 미니PC의 `deploy/production.env`에 실제 `ACME_EMAIL`, `POSTGRES_PASSWORD`, `DUCKDNS_TOKEN`을 입력한다. 파일은 Git 추적에서 제외되며 실제 값은 채팅·문서·명령 인수에 쓰지 않는다.
+3. 배포 디렉터리의 PowerShell에서 다음 명령을 순서대로 실행한다.
 
    ```powershell
-   docker compose --env-file C:/ProgramData/HourBoard/production.env -f compose.prod.yaml config --quiet
-   docker compose --env-file C:/ProgramData/HourBoard/production.env -f compose.prod.yaml build app
-   docker compose --env-file C:/ProgramData/HourBoard/production.env -f compose.prod.yaml up -d
-   docker compose --env-file C:/ProgramData/HourBoard/production.env -f compose.prod.yaml ps -a
+   docker compose --env-file deploy/production.env -f compose.prod.yaml config --quiet
+   docker compose --env-file deploy/production.env -f compose.prod.yaml build app
+   docker compose --env-file deploy/production.env -f compose.prod.yaml up -d
+   docker compose --env-file deploy/production.env -f compose.prod.yaml ps -a
    ```
 
 4. `db`는 healthy, `migrate`는 exit 0, `app`·`traefik`·`duckdns-updater`는 running인지 확인한다. Migration 실패 시 앱을 공개하지 말고 원인을 해결한다.

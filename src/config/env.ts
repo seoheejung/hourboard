@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
 
 export function readConfig() {
@@ -7,7 +7,7 @@ export function readConfig() {
       existsSync('.env')) {
     loadEnvFile();
   }
-  const { NODE_ENV, PORT, DATABASE_URL, DATABASE_PASSWORD_FILE,
+  const { NODE_ENV, PORT, DATABASE_URL, POSTGRES_PASSWORD,
     DATABASE_HOST, DATABASE_USER, DATABASE_NAME } = process.env;
   if (!NODE_ENV || !['development', 'test', 'production'].includes(NODE_ENV)) {
     throw new Error('NODE_ENV must be development, test, or production');
@@ -16,20 +16,18 @@ export function readConfig() {
   if (!PORT || !Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PORT must be an integer from 1 to 65535');
   }
-  if (DATABASE_URL && DATABASE_PASSWORD_FILE) {
-    throw new Error('Set DATABASE_URL or DATABASE_PASSWORD_FILE, not both');
+  if (DATABASE_URL && POSTGRES_PASSWORD) {
+    throw new Error('Set DATABASE_URL or POSTGRES_PASSWORD, not both');
   }
   let databaseUrl = DATABASE_URL;
-  if (!databaseUrl && DATABASE_PASSWORD_FILE) {
+  if (!databaseUrl && POSTGRES_PASSWORD) {
     if (!DATABASE_HOST || !DATABASE_USER || !DATABASE_NAME) {
-      throw new Error('DATABASE_HOST, DATABASE_USER, and DATABASE_NAME are required with DATABASE_PASSWORD_FILE');
+      throw new Error('DATABASE_HOST, DATABASE_USER, and DATABASE_NAME are required with POSTGRES_PASSWORD');
     }
-    const password = readFileSync(DATABASE_PASSWORD_FILE, 'utf8').replace(/\r?\n$/, '');
-    if (!password) throw new Error('DATABASE_PASSWORD_FILE must not be empty');
     const url = new URL('postgresql://localhost');
     url.hostname = DATABASE_HOST;
     url.username = DATABASE_USER;
-    url.password = password;
+    url.password = POSTGRES_PASSWORD;
     url.pathname = `/${DATABASE_NAME}`;
     databaseUrl = url.toString();
   }

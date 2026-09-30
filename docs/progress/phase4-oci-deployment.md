@@ -67,6 +67,6 @@ OCI 시도 기록은 유지한다. 사용자는 [Phase 4B 지침](../instruction
 
 기존 Docker 기반 443 서비스가 없어 사전 미로그인 재부팅 시험은 수행하지 않았다. 이 결과는 실패가 아니라 미검증이다. 현재 DuckDNS 자동 갱신 주체도 없다고 사용자가 확인했으므로 운영 Compose의 `duckdns-updater`를 기본 서비스로 준비했다.
 
-작업 PC에서 운영용 `compose.prod.yaml`, Traefik DNS-01, Fastify production bind, PostgreSQL volume, migration, 분리된 운영 비밀 파일 경로와 DuckDNS updater를 준비했다. `npm run build`와 Compose 구성 검사는 통과했다. 작업 PC에는 Docker Engine이 없어 이미지 빌드 및 실제 PostgreSQL·HTTPS E2E는 수행하지 못했다.
+작업 PC에서 운영용 `compose.prod.yaml`, Traefik DNS-01, Fastify production bind, PostgreSQL volume, migration, Git에서 제외되는 단일 `deploy/production.env` 주입 경로와 DuckDNS updater를 준비했다. `npm run build`와 Compose 구성 검사는 통과했다. 작업 PC에는 Docker Engine이 없어 이미지 빌드 및 실제 PostgreSQL·HTTPS E2E는 수행하지 못했다.
 
-다음 단계는 미니PC에서 비밀 파일 생성, 이미지 빌드와 Compose 기동, migration·앱·DuckDNS 갱신·인증서 확인이다. 그 뒤 미니PC LAN IPv4 DHCP 예약, 공유기 TCP 443 포트포워딩, 외부망 HTTPS·E2E, production reboot와 latency를 검증한다. 직접 인바운드 TCP 443 도달 여부와 자동 복구는 아직 미검증이며 Phase 4B 완료로 기록하지 않는다.
+다음 단계는 미니PC에서 `deploy/production.env`의 실제 값 설정, 이미지 빌드와 Compose 기동, migration·앱·DuckDNS 갱신·인증서 확인이다. 그 뒤 미니PC LAN IPv4 DHCP 예약, 공유기 TCP 443 포트포워딩, 외부망 HTTPS·E2E, production reboot와 latency를 검증한다. 직접 인바운드 TCP 443 도달 여부와 자동 복구는 아직 미검증이며 Phase 4B 완료로 기록하지 않는다.
