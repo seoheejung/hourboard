@@ -9,6 +9,8 @@ build/
 .env
 .env.*
 !.env.example
+# Operator-only configuration if a local copy is created accidentally.
+production.env
 deploy/production.env
 deploy/secrets/
 
