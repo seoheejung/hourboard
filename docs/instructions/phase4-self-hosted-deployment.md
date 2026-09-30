@@ -268,7 +268,7 @@ db_password     → PostgreSQL과 Fastify 공유
 duckdns_token   → Traefik과 DuckDNS updater 공유
 ```
 
-`deploy/production.env.example`은 Git에 올리는 예시이며 실제 `production.env`는 작업 PC에 생성하지 않는다. 미니PC에서 예시를 참고해 저장소 밖 `C:/ProgramData/HourBoard/production.env`를 만들고 `HOURBOARD_DB_PASSWORD_FILE`, `HOURBOARD_DUCKDNS_TOKEN_FILE`, `ACME_EMAIL`을 지정한다. 저장소 안에 실수로 `production.env`를 만들더라도 `.gitignore`에서 제외한다. 두 비밀 파일에는 각각 비밀번호와 토큰 값만 UTF-8 BOM·줄바꿈 없이 저장한다. 비밀값을 CLI 인수나 Compose 환경 변수 값으로 직접 전달하지 않는다. Fastify는 DB 암호 파일과 비밀값이 아닌 DB host/user/name으로 URL을 만들며 production에서 저장소 `.env` fallback을 사용하지 않는다. 로컬 개발용 `.env`에는 DuckDNS 토큰을 추가하지 않는다.
+`deploy/production.env.example`은 Git에 올리는 빈 예시이며 실제 `production.env`는 작업 PC에 생성하지 않는다. 미니PC에서 예시를 참고해 저장소 밖 `C:/ProgramData/HourBoard/production.env`를 만들고 실제 연락 이메일 `ACME_EMAIL`과 비밀 파일의 공통 디렉터리 `HOURBOARD_SECRET_DIR`을 지정한다. 예시의 빈 값은 Compose 검사를 통과하지 못한다. 저장소 안에 실수로 `production.env`를 만들더라도 `.gitignore`에서 제외한다. `HOURBOARD_SECRET_DIR` 아래의 `db_password`, `duckdns_token` 파일에는 각각 비밀번호와 토큰 값만 UTF-8 BOM·줄바꿈 없이 저장한다. 비밀값을 CLI 인수나 Compose 환경 변수 값으로 직접 전달하지 않는다. Fastify는 DB 암호 파일과 비밀값이 아닌 DB host/user/name으로 URL을 만들며 production에서 저장소 `.env` fallback을 사용하지 않는다. 로컬 개발용 `.env`에는 DuckDNS 토큰을 추가하지 않는다.
 
 금지:
 
@@ -330,7 +330,7 @@ Windows 방화벽에서도 TCP 443만 필요한 범위로 허용한다.
 ### 미니PC
 
 1. 저장소 또는 배포 아티팩트를 미니PC에 배치한다.
-2. 저장소 밖에 운영 설정 파일과 `db_password`, `duckdns_token` 비밀 파일을 만든다. `deploy/production.env.example`의 경로와 이메일을 실제 값으로 바꾼다. 토큰·암호의 실제 값은 저장소, 채팅, 명령 인수에 쓰지 않는다.
+2. 저장소 밖에 운영 설정 파일과 비밀 디렉터리를 만든다. `production.env`에는 실제 `ACME_EMAIL`과 `HOURBOARD_SECRET_DIR`만 설정하고, 그 디렉터리에 `db_password`, `duckdns_token` 파일을 둔다. 토큰·암호의 실제 값은 저장소, 채팅, 명령 인수에 쓰지 않는다.
 3. 배포 디렉터리의 PowerShell에서 다음 명령을 순서대로 실행한다. 실제 운영 설정 파일 경로를 사용한다.
 
    ```powershell

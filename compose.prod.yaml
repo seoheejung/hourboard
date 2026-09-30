@@ -114,6 +114,6 @@ volumes:
 
 secrets:
   db_password:
-    file: ${HOURBOARD_DB_PASSWORD_FILE:?Set HOURBOARD_DB_PASSWORD_FILE in the external production environment file}
+    file: ${HOURBOARD_SECRET_DIR:?Set HOURBOARD_SECRET_DIR in the external production environment file}/db_password
   duckdns_token:
-    file: ${HOURBOARD_DUCKDNS_TOKEN_FILE:?Set HOURBOARD_DUCKDNS_TOKEN_FILE in the external production environment file}
+    file: ${HOURBOARD_SECRET_DIR:?Set HOURBOARD_SECRET_DIR in the external production environment file}/duckdns_token
