@@ -115,7 +115,7 @@ winner message mutation = 0
 
 ---
 
-## 7. 환경 변수
+## 7. 환경 변수 및 민감정보
 
 설정값은 가능한 한 환경 변수로 관리한다.
 
@@ -132,6 +132,11 @@ MAX_MESSAGE_LENGTH
 - `.env` 커밋 금지
 - 필요한 변수는 `.env.example`을 구현하는 Phase에서 명시
 - 기본값이 안전하지 않으면 암묵적 fallback 금지
+- 운영 credential과 token을 코드, 문서, 로그, 테스트 아티팩트에 기록하지 않음
+- 실제 공인 IPv4, 내부 LAN IPv4, MAC address, Windows 사용자명·홈 경로 등 개인 환경을 식별할 수 있는 값을 저장소 문서에 기록하지 않음
+- 공유기 관리자 계정·비밀번호, DuckDNS token, DB password, production `DATABASE_URL`, 인증서 private key 등 secret 커밋 금지
+- 문서와 설정 예시는 실제 값 대신 `<MINIPC_LAN_IP>`, `<PUBLIC_IP>`, `<DUCKDNS_TOKEN>` 같은 placeholder 사용
+- 운영 환경에서 확인한 값은 필요한 경우 성공·실패 여부나 상태만 기록하고 실제 민감값은 기록하지 않음
 
 ---
 

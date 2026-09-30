@@ -8,20 +8,17 @@
 
 HourBoard는 매시 정각 하나의 시간 슬롯을 열고, 해당 슬롯에 가장 먼저 등록된 문구 하나만 한 시간 동안 전광판에 노출하는 웹 서비스다.
 
-사용자는 정각이 되기 전에 문구를 입력해두고 등록 버튼을 누른다.   
-같은 순간 여러 사용자가 요청을 보내면 서버와 PostgreSQL이 동일한 시간 슬롯을 두고 요청을 처리한다.   
-가장 먼저 확정된 요청은 `1등`이 되고, 해당 문구가 그 시간의 전광판을 차지한다.
-첫 등록 이후 10초 안에 처리된 후속 요청은 전광판을 바꾸지 못하지만 자신의 처리 순위를 바로 확인할 수 있다.
-등록 Window가 종료된 뒤의 요청은 순위를 받지 않고 등록이 거부된다.
+사용자는 정각이 되기 전에 문구를 입력해두고 등록 버튼을 누른다. 같은 순간 여러 사용자가 요청을 보내면 서버와 PostgreSQL이 동일한 시간 슬롯을 두고 요청을 처리한다. 가장 먼저 확정된 요청은 `1등`이 되고, 해당 문구가 그 시간의 전광판을 차지한다.
 
-서비스 표면에서는 정각 티켓팅 연습과 가벼운 경쟁 경험을 제공한다.    
-개발 관점에서는 하나의 자원에 동시 요청이 몰릴 때 발생하는 race condition, atomic update, row contention, connection pool, 서버 시간 기준 처리, 부하 증가에 따른 latency 변화를 실제 서비스 규칙 안에서 구현하고 검증한다.
+첫 등록 이후 10초 안에 처리된 후속 요청은 전광판을 바꾸지 못하지만 자신의 처리 순위를 바로 확인할 수 있다. Registration Window가 종료된 뒤의 요청은 순위를 받지 않고 등록이 거부된다.
+
+서비스 표면에서는 정각 티켓팅 연습과 가벼운 경쟁 경험을 제공한다. 개발 관점에서는 하나의 자원에 동시 요청이 몰릴 때 발생하는 race condition, atomic update, row contention, connection pool, 서버 시간 기준 처리, 부하 증가에 따른 latency 변화를 실제 서비스 규칙 안에서 구현하고 검증한다.
 
 ---
 
 ## 학습 범위
 
-### 현재 구현·검증
+### Phase 1~2 구현·검증
 
 - Race Condition
 - PostgreSQL UPSERT
@@ -31,6 +28,8 @@ HourBoard는 매시 정각 하나의 시간 슬롯을 열고, 해당 슬롯에 �
 - Connection Pool
 - Server Time Synchronization
 - E2E Concurrency Test
+- Registration Window
+- 브라우저 핵심 사용자 흐름
 
 ### Phase 3 구현·검증
 
@@ -68,14 +67,16 @@ HourBoard는 매시 정각 하나의 시간 슬롯을 열고, 해당 슬롯에 �
 
 ### 개발자 / 운영자
 
-MVP 이후 부하 검증과 운영 환경 검증을 포함해 시스템 동작을 확인한다.
+동시성 동작, 부하 특성, 실제 운영 배포 환경을 검증한다.
 
 - 동시 요청 정합성 검증
 - PostgreSQL row contention 관찰
 - latency 측정
 - E2E 동시성 검증
 - k6 부하 테스트
-- OCI 배포 환경 검증
+- 외부 HTTPS 및 운영 복구 검증
+
+---
 
 ## Service Rule
 
@@ -207,7 +208,7 @@ MVP 기준:
 
 ## 아키텍처
 
-### 현재 MVP
+### 로컬 개발
 
 ```mermaid
 flowchart LR
@@ -215,17 +216,34 @@ flowchart LR
     Fastify --> PostgreSQL[(PostgreSQL)]
 ```
 
-### 최종
+개발 환경에서는 Fastify와 Docker Compose PostgreSQL을 로컬에서 실행한다.
+
+### Phase 4B 운영 목표
 
 ```mermaid
 flowchart LR
-    Browser -->|HTTPS| Fastify[Fastify API\nOCI Compute]
-    Fastify -->|localhost:5432| PostgreSQL[(PostgreSQL)]
+    Browser -->|HTTPS| DuckDNS[hourboard.duckdns.org]
+    DuckDNS --> Router[Home Router\nTCP 443]
+    Router --> Traefik[Traefik\nMini PC]
+    Traefik --> Fastify[Fastify API + Static Web]
+    Fastify --> PostgreSQL[(PostgreSQL)]
 ```
 
-현재 MVP는 로컬 환경에서 Fastify와 PostgreSQL을 실행한다.
+운영 경로는 **DuckDNS → 가정망 TCP 443 직접 인바운드 → Traefik → Fastify → PostgreSQL** 구조다.
 
-Phase 4에서는 API와 PostgreSQL을 동일 OCI Compute VM에 배포하고 HTTPS, systemd, reboot recovery, 외부 RTT를 검증한다.
+- Traefik만 host TCP `443`을 공개한다.
+- Fastify `3000`은 Docker 내부에서만 사용한다.
+- PostgreSQL `5432`는 외부에 공개하지 않는다.
+- Traefik과 Fastify는 `edge` network를 공유한다.
+- Fastify와 PostgreSQL은 `data` network를 공유한다.
+- HTTPS 인증서는 Let's Encrypt DNS-01과 DuckDNS를 사용한다.
+- TCP `80`은 Phase 4B 기본 운영 경로에서 열지 않는다.
+
+### Phase 4A OCI 시도
+
+OCI Japan East (Tokyo) A1 Flex를 무료 배포 후보로 검증했으나 Compute Capacity Report와 실제 생성 시도에서 host capacity 부족이 확인됐다.
+
+유료 shape 또는 다른 Region으로 자동 전환하지 않고 Phase 4B 자체 호스팅 경로로 전환했다. OCI 진행 사실은 [Phase 4 OCI 진행 기록](docs/progress/phase4-oci-deployment.md)에 보존한다.
 
 ---
 
@@ -238,13 +256,21 @@ Phase 4에서는 API와 PostgreSQL을 동일 OCI Compute VM에 배포하고 HTTP
 | Backend | Fastify 5.x |
 | Database | PostgreSQL 18.x |
 | Local Infrastructure | Docker Compose |
-| Production Target | OCI Compute — Phase 4 예정 |
-| Production Region | Seoul — Phase 4에서 home region 조건 확인 |
+| Production Host | EcoBe-A1 Mini PC |
+| Production Host OS | Windows 11 |
+| Linux Environment | WSL2 Ubuntu |
+| Container Runtime | Docker Desktop |
+| Reverse Proxy | Traefik |
+| Public Hostname | `hourboard.duckdns.org` |
+| TLS | Let's Encrypt DNS-01 |
+| Dynamic DNS | DuckDNS |
 | Load Test | k6 |
 
 ---
 
-## 환경 변수
+## 환경 변수 및 민감정보
+
+### 애플리케이션 환경 변수
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
@@ -263,6 +289,18 @@ DATABASE_URL=postgresql://hourboard:hourboard@localhost:5432/hourboard
 ```
 
 운영 환경에서는 별도의 PostgreSQL 계정과 비밀번호를 사용하며 기본 비밀번호를 코드에 포함하지 않는다.
+
+### 저장소 민감정보 기준
+
+- 비밀값 코드 하드코딩 금지
+- 운영 credential과 token을 코드, 문서, 로그, 테스트 아티팩트에 기록하지 않음
+- 실제 공인 IPv4, 내부 LAN IPv4, MAC address, Windows 사용자명·홈 경로를 저장소 문서에 기록하지 않음
+- 공유기 관리자 credential, DuckDNS token, DB password, production `DATABASE_URL`, 인증서 private key 커밋 금지
+- 문서와 설정 예시는 실제 값 대신 `<MINIPC_LAN_IP>`, `<PUBLIC_IP>`, `<DUCKDNS_TOKEN>` 같은 placeholder 사용
+- 운영 확인 결과는 필요한 경우 성공·실패 여부와 상태만 기록하고 실제 민감값은 기록하지 않음
+- production은 저장소 `.env` fallback에 의존하지 않음
+
+Phase 4B 운영 설정에는 애플리케이션 변수 외에 PostgreSQL credential과 `DUCKDNS_TOKEN`이 필요하지만 실제 값은 저장소 외부에서 주입한다.
 
 ---
 
@@ -362,15 +400,15 @@ missing position = 0
 winner message mutation = 0
 ```
 
-Registration Window 종료 후 REGISTRATION_CLOSED로 거부된 요청은 Position을 소비하지 않는다.
+Registration Window 종료 후 `REGISTRATION_CLOSED`로 거부된 요청은 Position을 소비하지 않는다.
 
 ---
 
-## MVP Scope
-
-**상태: 완료**
+## Phase 상태
 
 ### Phase 1 — Concurrency Core
+
+**상태: 완료**
 
 - Fastify 서버
 - 환경 변수 검증
@@ -386,10 +424,12 @@ Registration Window 종료 후 REGISTRATION_CLOSED로 거부된 요청은 Positi
 
 ### Phase 2 — Ticketing UI
 
+**상태: 완료**
+
 - 현재 전광판
 - 빈 전광판 상태
 - server time 보정
-- millisecond Countdown
+- 초 단위 Countdown
 - 문구 사전 입력
 - 등록 버튼
 - 중복 클릭 차단
@@ -400,7 +440,7 @@ Registration Window 종료 후 REGISTRATION_CLOSED로 거부된 요청은 Positi
 - 접근성 상태 알림
 - 첫 등록 후 10초 Registration Window
 - `REGISTRATION_CLOSED` 처리
-- Registration Window countdown
+- Registration Window 초 단위 countdown
 - Winner 없는 Round에서 등록 가능
 - 등록 마감 후 버튼 숨김
 - 다음 정각 5분 전 버튼 비활성 재표시
@@ -418,27 +458,54 @@ Registration Window 종료 후 REGISTRATION_CLOSED로 거부된 요청은 Positi
 
 로컬 Compose PostgreSQL 실행 후 `NODE_ENV=test`, 로컬 `DATABASE_URL`, 포터블 k6의 `K6_BIN`을 셸 환경 변수로 설정하고 `npm.cmd run load:phase3`으로 전체 측정을 재실행할 수 있다. 스크립트는 별도 load-test DB를 사용하며 실제 다음 정각을 관찰한다.
 
----
+### Phase 4 — Production Deployment
 
-## 이후 작업
+**상태: 진행 중**
 
-### Phase 4 — OCI Deployment
+Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, 복구, 보안 포트, 외부 E2E와 latency를 검증한다.
 
-**상태: 예정**
+#### Phase 4A — OCI
 
-- OCI home region 및 무료 사용 조건 확인
-- OCI Compute 배포
-- Node.js 24 LTS
-- PostgreSQL 18.x
-- API + PostgreSQL 동일 VM 구성
-- PostgreSQL `localhost:5432` 제한
-- systemd
-- HTTPS
-- 운영 환경 변수
-- reboot recovery
-- 실제 외부 E2E
-- 외부 RTT 및 등록 latency 측정
-- Phase 3 로컬 baseline과 OCI 결과 비교
+- OCI Home Region: Japan East (Tokyo) / `ap-tokyo-1`
+- A1 Flex 무료 배포 경로 검토
+- Compute Capacity Report에서 host capacity 부족 확인
+- 실제 Compute 생성 시도에서도 capacity 부족 확인
+- 유료 shape 또는 다른 Region으로 자동 전환하지 않음
+- 진행 기록: [Phase 4 OCI 진행 기록](docs/progress/phase4-oci-deployment.md)
+
+#### Phase 4B — 자체 호스팅 미니PC
+
+현재 기본 배포 경로다.
+
+사전 확인 완료:
+
+- 공유기 WAN IPv4와 외부 관측 IPv4 일치
+- DuckDNS A 레코드 정상 해석
+- 현재 확인 범위에서 CGNAT 징후 없음
+- 미니PC Windows 11 / WSL2 / Docker Desktop 확인
+- Docker Linux Engine / x86_64 확인
+- 운영 배포에 충분한 저장 공간 확인
+- 현재 실행 중 Docker 컨테이너 없음
+- 현재 TCP 80/443/3000/5432 listener 없음
+
+남은 검증:
+
+- `compose.prod.yaml`
+- Traefik
+- Fastify production bind
+- PostgreSQL production volume
+- DuckDNS updater
+- Let's Encrypt DNS-01
+- 공유기 TCP 443 포트포워딩
+- Windows 방화벽
+- 실제 외부 HTTPS
+- production reboot
+- DB persistence
+- 실제 브라우저 흐름
+- 외부 E2E
+- 외부 RTT 및 p50 / p95 / p99
+
+세부 지침: [Phase 4B 자체 호스팅 배포](docs/instructions/phase4-self-hosted-deployment.md)
 
 ---
 
@@ -452,6 +519,7 @@ hourboard/
 │  └─ migrations/
 ├─ docs/
 │  ├─ instructions/
+│  ├─ progress/
 │  └─ results/
 ├─ src/
 │  ├─ config/
@@ -477,6 +545,8 @@ hourboard/
 └─ README.md
 ```
 
+Phase 4B 구현 시 운영 Compose 파일은 개발용 `compose.yaml`과 분리한다.
+
 ---
 
 ## 문서
@@ -487,6 +557,33 @@ hourboard/
 | `AGENTS.md` | 저장소 작업 규칙 |
 | `DESIGN.md` | 전광판 UI, 상태, 접근성, 성능 기준 |
 | `docs/instructions/*` | 현재 Phase 작업 지침 |
+| `docs/progress/*` | 진행 중인 인프라 시도와 사실 기록 |
 | `docs/results/*` | 완료된 구현·검증 결과 |
+| `docs/instructions/phase4-self-hosted-deployment.md` | Phase 4B 미니PC 배포·검증 지침 |
+| `docs/progress/phase4-oci-deployment.md` | OCI Phase 4A 시도와 capacity 결과 |
 
 ---
+
+## 현재 배포 경로
+
+```text
+hourboard.duckdns.org
+        ↓
+DuckDNS
+        ↓
+가정망 공인 IPv4
+        ↓
+공유기 TCP 443
+        ↓
+EcoBe-A1 Mini PC
+        ↓
+Docker Desktop
+        ↓
+Traefik
+        ↓
+Fastify
+        ↓
+PostgreSQL
+```
+
+실제 공인 IPv4, 미니PC LAN IPv4, 운영 credential은 저장소에 기록하지 않는다.

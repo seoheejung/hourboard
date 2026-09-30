@@ -12,14 +12,17 @@ import { apiError } from './shared/types.js';
 const config = readConfig();
 const pool = createPool(config.databaseUrl);
 const app = Fastify({
-  logger: false,
+  logger: config.nodeEnv === 'production' ? { level: 'error' } : false,
   bodyLimit: 4096,
   ajv: { customOptions: { coerceTypes: false, removeAdditional: false } }
 });
 
-app.setErrorHandler((error, _request, reply) => {
+app.setErrorHandler((error, request, reply) => {
   const details = error as { statusCode?: number; validation?: unknown };
   const isBadRequest = details.statusCode === 400 || details.statusCode === 413 || Boolean(details.validation);
+  if (!isBadRequest && config.nodeEnv === 'production') {
+    app.log.error({ category: 'INTERNAL_ERROR', errorName: error instanceof Error ? error.name : 'Unknown', route: request.routeOptions.url }, 'Request failed');
+  }
   reply.code(isBadRequest ? 400 : 500).send(isBadRequest
     ? apiError('INVALID_REQUEST', '요청 본문을 확인해 주세요.')
     : apiError('INTERNAL_ERROR', '요청을 처리하지 못했습니다.'));
@@ -38,8 +41,9 @@ app.setNotFoundHandler((request, reply) => {
 app.addHook('onClose', async () => { await pool.end(); });
 
 try {
-  await app.listen({ port: config.port, host: '127.0.0.1' });
-  console.log(`HourBoard listening on 127.0.0.1:${config.port}`);
+  const host = config.nodeEnv === 'production' ? '0.0.0.0' : '127.0.0.1';
+  await app.listen({ port: config.port, host });
+  console.log(`HourBoard listening on ${host}:${config.port}`);
 } catch {
   await app.close();
   process.exitCode = 1;

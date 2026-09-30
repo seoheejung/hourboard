@@ -56,7 +56,7 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 - 동시에 들어온 요청에서 승자를 정확히 1명만 확정
 - 모든 처리 성공 요청에 중복 없는 순번 부여
 - hot path의 DB 접근을 등록 요청당 1회로 제한
-- API 서버와 PostgreSQL을 동일 OCI VM에 배치해 외부 DB RTT 제거
+- API 서버와 PostgreSQL을 동일 서버에 배치해 외부 DB RTT 제거
 - PostgreSQL row contention과 atomic UPSERT 동작 직접 검증
 - 동시 요청 증가에 따른 p50 / p95 / p99 latency 변화 측정
 - E2E 부하 테스트 결과를 반복 가능한 아티팩트로 저장
@@ -95,10 +95,10 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 | Language | TypeScript | 서버·브라우저 공통 타입 관리 |
 | Backend | Fastify 5.x | 낮은 오버헤드, JSON Schema 기반 검증 |
 | Database | PostgreSQL 18.x | UPSERT, row locking, MVCC 기반 동시성 검증 |
-| Infrastructure | OCI Compute Always Free | 단일 Linux VM |
-| Region | OCI Japan East (Tokyo) | 현재 계정 home region `ap-tokyo-1` 기준 |
+| Infrastructure | 단일 호스트 | OCI Linux VM 또는 Windows 11 미니PC + Docker Desktop |
+| 배포 위치 | OCI Japan East (Tokyo) 또는 자체 호스팅 | 실제 배포 환경을 결과에 명시 |
 | Load Test | k6 | Registration Race, polling, Thundering Herd 및 latency 측정 |
-| Process | systemd | API 프로세스 상시 실행 |
+| Process | OCI: systemd / 미니PC: Docker Desktop | 선택한 경로의 재시작·reboot 복구 검증 |
 
 ### 버전 정책
 
@@ -112,20 +112,24 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 ## 6. 인프라 구조
 ```mermaid
 flowchart LR
-    U[Browser] -->|HTTPS| A[Fastify API\nOCI Tokyo VM]
-    K[k6] -->|Load Test| A
-    A -->|localhost:5432| P[(PostgreSQL)]
+    U[Browser] -->|HTTPS| I[선택한 배포 경로의 ingress]
+    K[k6] -->|Load Test| I
+    I --> A[Fastify API\n단일 호스트]
+    A --> P[(PostgreSQL\n동일 호스트)]
 ```
 ### 배치 원칙
 
 - OCI Always Free Compute는 계정 home region에서 생성
-- 이번 배포는 현재 계정 home region인 Japan East (Tokyo) 기준
-- Phase 4 시작 시 OCI 공식 문서에서 현재 Always Free Compute 조건과 제공 shape를 다시 확인하고 무료 범위 안에서 단일 VM을 선택
-- Always Free capacity 확보 실패 시 임의의 유료 shape로 변경 금지
-- API와 PostgreSQL을 동일 VM에 배치
+- OCI 시도는 현재 계정 home region인 Japan East (Tokyo) 기준
+- OCI를 재시도할 때 공식 문서와 Console에서 무료 조건을 확인하고 유료 shape로 임의 변경하지 않음
+- Tokyo A1 capacity 부족에 따라 Phase 4B 기본 경로는 자체 호스팅 미니PC + DuckDNS + Traefik으로 선택
+- Phase 4B 운영 주소는 `hourboard.duckdns.org`; 공유기 WAN에 직접 도달 가능한 공인 IPv4가 있는지 확인한 뒤 TCP 443만 미니PC로 포트포워딩
+- DuckDNS updater로 변경되는 공인 IPv4를 갱신하고 Traefik의 Let's Encrypt DNS-01으로 HTTPS 인증서를 발급·갱신; DNS-01을 위해 TCP 80을 공개하지 않음
+- Phase 4B의 Traefik과 Fastify는 `edge` Docker network를, Fastify와 PostgreSQL은 `data` Docker network를 공유함. PostgreSQL은 `edge`에 연결하지 않고 앱·DB 포트를 호스트에 publish하지 않음
+- API와 PostgreSQL을 동일 호스트에 배치
 - PostgreSQL 5432 포트 외부 공개 금지
-- PostgreSQL은 localhost 또는 private interface에서만 수신
-- 외부 공개 포트는 웹 서비스에 필요한 포트만 허용
+- PostgreSQL은 localhost 또는 컨테이너 내부 네트워크에서만 접근 허용
+- OCI 경로에서만 웹 서비스에 필요한 호스트 포트를 공개
 - DB connection pool은 애플리케이션 시작 시 생성하고 요청마다 재생성하지 않음
 - 애플리케이션 상태를 메모리에만 저장하지 않음
 
@@ -139,7 +143,7 @@ flowchart LR
 - 사용자 표시는 Asia/Seoul 기준
 - 라운드 경계는 매시 `00:00:00.000`
 - API 서버의 시스템 시간을 authoritative clock으로 사용
-- OCI VM의 시스템 시간 동기화 상태를 운영 점검 항목에 포함
+- 배포 서버의 시스템 시간 동기화 상태를 운영 점검 항목에 포함
 
 ### 목표 슬롯 검증
 
@@ -342,7 +346,7 @@ SELECT 존재 확인
 - 불필요한 ORM 추상화 도입 금지
 - 성능 측정 전 임의의 cache/Redis 추가 금지
 
-절대 latency 목표는 기획 단계에서 임의로 확정하지 않는다. Phase 3에서는 로컬 환경 baseline을 만들고, Phase 4에서는 OCI 외부 환경 baseline과 RTT를 별도로 측정한다. 두 환경의 결과를 구분한 뒤 성능 budget 필요 여부를 판단한다.
+절대 latency 목표는 기획 단계에서 임의로 확정하지 않는다. Phase 3에서는 로컬 환경 baseline을 만들고, Phase 4에서는 실제 외부 배포 환경의 baseline과 RTT를 별도로 측정한다. 두 환경의 결과를 구분한 뒤 성능 budget 필요 여부를 판단한다.
 
 측정 항목:
 
@@ -483,63 +487,64 @@ Phase 3에서 위 기능을 다시 설계하지 않는다.
 - baseline artifact 생성 완료
 - 결과: `docs/results/phase3-load-race-verification.md`
 
-### Phase 4 — OCI Deployment
+### Phase 4 — Production Deployment
 
 **상태: 지금 작업**
 
 Phase 3 로컬 baseline을 수정하지 않고 비교 기준으로 사용한다. 실제 외부 환경에서 배포·복구·보안·latency를 검증한다.
 
-OCI 계정 생성은 완료되었으며 Home Region은 **Japan East (Tokyo)**, Region identifier는 **`ap-tokyo-1`**이다.
+**Phase 4A — OCI Tokyo A1 시도:** OCI 계정 Home Region은 **Japan East (Tokyo)**, Region identifier는 **`ap-tokyo-1`**이다. VCN과 Terraform Stack을 만들고 Plan·Apply를 실행했으나 A1 host capacity 부족으로 Compute VM 생성에 실패했다. 실제 시도 기록은 [Phase 4 OCI 진행 기록](../docs/progress/phase4-oci-deployment.md)에 보존한다. OCI를 다시 시도할 때의 기준은 `docs/instructions/phase4-oci-deployment.md`를 따른다.
 
-세부 구현 기준은 `docs/instructions/phase4-oci-deployment.md`를 따른다.
-현재 수동 확인·capacity blocker·남은 검증은 [Phase 4 진행 기록](../docs/progress/phase4-oci-deployment.md)에 별도로 기록한다. Phase 4 완료 상태로 이동하지 않는다.
+**Phase 4B — 자체 호스팅 기본 경로:** EcoBe-A1 미니PC에서 Windows 11과 Docker Desktop을 유지하고 `hourboard.duckdns.org`를 최종 운영 주소로 사용한다. DuckDNS가 집 공인 IPv4를 가리키고, 공유기의 TCP 443 포트포워딩이 미니PC의 Traefik에 연결된다. Traefik은 Fastify로 전달하고 Let's Encrypt DNS-01과 DuckDNS TXT API로 인증서를 발급·갱신한다. DuckDNS updater는 변경되는 공인 IPv4를 갱신한다. 사용자 제공 장비 정보는 Intel N100(4C/4T), RAM 16GB이며 현재 WSL2 Ubuntu·Nginx와 자체 서명 인증서 기반 내부망 HTTPS를 사용한다. 기존 Nginx·Fastify·PostgreSQL의 실제 실행 위치와 연결 방식은 미확인이고, 기존 내부망 HTTPS는 외부 공개 배포 결과가 아니다. 운영 Compose 구성 전 미니PC 저장 공간·Docker backend·기존 443 listener와 앱 경로, 공유기 WAN IPv4와 외부 관측 IPv4 일치 여부, CGNAT·이중 NAT 여부, TCP 443 포트포워딩 가능 여부를 확인한다. 직접 인바운드가 불가능하면 이 경로를 배포 성공으로 간주하지 않고 전제 해결 또는 계획 변경을 먼저 판단한다. 기존 Docker 기반 HourBoard 경로가 있으면 로그인 없는 Windows 재부팅 후 다른 LAN 기기의 응답을 사전 시험한다. 경로가 없으면 사전 자동 복구는 미검증으로 남긴다. Traefik과 Fastify는 `edge`, Fastify와 PostgreSQL은 `data` Docker network를 공유한다. Traefik의 TCP 443만 호스트에 publish하고 Fastify·PostgreSQL·Traefik dashboard 포트는 공개하지 않는다. 기존 Nginx는 전환 전 현황을 확인하고 TCP 443 충돌을 해소한다. 구성·검증 기준은 `docs/instructions/phase4-self-hosted-deployment.md`를 따른다.
+
+Phase 4B의 자동 복구는 **필수 검증 대상**이며 성공 자체는 완료 조건이 아니다. 최종 운영 구성에서 미로그인 재부팅 실험이 실패하면 실패 시점, 로그인 전 서비스 상태, 수동 복구 방법, 재접속 결과와 운영 제약을 기록한다. 외부 HTTPS·보안 포트·DB 데이터 보존·핵심 E2E 등 나머지 완료 기준을 충족하면 자동 복구 실패를 명시한 상태로 Phase 4B를 완료할 수 있다. OCI 경로의 systemd 자동 복구 성공 기준은 유지한다.
+
+두 경로 중 실제 배포한 경로에서 아래 공통 완료 기준을 검증한다. OCI 시도만으로 Phase 4 완료 상태로 이동하지 않는다.
 
 범위:
 
-- OCI account 및 Home Region `Japan East (Tokyo)` 확인
-- Phase 4 시작 시 OCI Console과 공식 문서에서 현재 Always Free 조건 재확인
-- 현재 계정에서 Tokyo Region의 무료 Compute eligibility 및 잔여 quota 확인
-- Tokyo Compute 생성 전 실제 계정의 quota·usage, `Always Free-eligible` 표시, 선택한 OCPU·memory·image·volume 구성을 대조한다. Console에 예상 비용이 표시되면 0인지 확인하고, 필드가 없는 것만으로 blocker로 보지 않는다. 무료 여부가 불명확하거나 표시된 비용이 0이 아니면 생성하지 않는다.
-- 무료 조건이 불명확하거나 capacity가 없으면 다른 Region 또는 유료 resource로 임의 전환하지 않음
-- VM image 및 architecture 확인
-- Node.js 24 LTS 설치
-- PostgreSQL 18.x 설치
+- OCI 경로: 계정·Home Region·무료 eligibility·quota를 확인하고 유료 리소스로 임의 전환하지 않음
+- 미니PC 경로: 저장 공간·Docker backend·기존 443 경로·가능하면 미로그인 reboot 사전 실험, 공유기 WAN IPv4와 외부 관측 IPv4 일치 여부·CGNAT·이중 NAT·TCP 443 포트포워딩 가능 여부를 운영 Compose 구성 전에 확인
+- 선택한 호스트와 컨테이너의 OS 및 architecture 확인
+- Node.js 24 LTS 실행 환경 구성
+- PostgreSQL 18.x 실행 환경 구성
 - production DB / user 구성
 - application deployment
-- systemd service
-- PostgreSQL `localhost:5432` 제한
+- OCI 경로: systemd service / 미니PC 경로: Docker Desktop·컨테이너 재시작 정책
+- PostgreSQL은 loopback 또는 컨테이너 내부 네트워크로 제한
 - application internal port 외부 비공개
-- 운영 EnvironmentFile 구성
+- 운영 환경 변수와 비밀값을 개발용 `compose.yaml`과 분리
 - production에서 저장소 `.env` fallback 비의존 확인
 - HTTPS
 - production 최소 structured error logging
-- reboot recovery
+- OCI 경로: reboot 자동 복구 / 미니PC 경로: 사전·최종 reboot 실험과 자동 복구 성공·실패 기록
 - DB data persistence
 - 실제 외부 환경 E2E
 - Winner / Position / 10초 Registration Window 핵심 Registration Race 재검증
 - 실제 브라우저 핵심 흐름 검증
 - 외부 RTT 및 등록 latency 측정
-- Phase 3 로컬 baseline과 Phase 4 OCI Tokyo 결과를 환경별로 분리 기록
+- Phase 3 로컬 baseline과 Phase 4 실제 배포 환경 결과를 환경별로 분리 기록
 
 완료 기준:
 
-- OCI Home Region이 `Japan East (Tokyo)`임을 확인
-- 현재 계정에서 사용한 Compute가 무료 대상임을 실제로 확인
-- 유료 resource 생성 없음
-- HTTPS로 서비스 접근 가능
+- 선택한 배포 경로와 서버·네트워크 전제 확인 결과를 기록
+- OCI 경로라면 무료 Compute 대상임을 실제로 확인하고 유료 리소스를 만들지 않음
+- 미니PC 경로라면 DuckDNS A 레코드·updater, 공유기·호스트 TCP 443 인바운드, Traefik DNS-01 인증서와 앱·DB 포트 비공개 상태를 기록
+- 외부망의 일반 브라우저에서 신뢰되는 인증서로 HTTPS 서비스 접근 가능
 - PostgreSQL 5432 외부 접근 불가
 - application 내부 포트 불필요한 외부 공개 없음
-- production 환경 변수가 별도 EnvironmentFile로 주입됨
+- production 환경 변수가 선택한 배포 경로의 별도 운영 설정으로 주입됨
 - production에서 저장소 `.env` fallback에 의존하지 않음
-- VM reboot 후 PostgreSQL과 HourBoard 자동 복구
-- reboot 후 HTTPS 접근 재확인
+- OCI 경로: 호스트 reboot 후 수동 조작 없이 PostgreSQL과 HourBoard 자동 복구
+- 미니PC 경로: 운영 구성 후 미로그인 reboot 실험을 수행하고, 자동 복구 성공 또는 실패·수동 복구 경로·운영 제약을 기록
+- reboot 후 HTTPS 접근 상태와 필요한 복구 후의 재접속 결과 확인
 - reboot 전후 DB 데이터 유지
 - 배포 환경에서 Winner / Position / 10초 Registration Window 핵심 invariant 통과
 - 실제 브라우저에서 핵심 사용자 흐름 확인
 - 외부 RTT 기록
 - GET `/api/round` 및 POST `/api/attempts` latency 측정
 - 등록 p50 / p95 / p99 및 sample 수 기록
-- 로컬 Phase 3 결과와 OCI Tokyo 결과를 같은 환경의 수치처럼 혼합하지 않음
+- 로컬 Phase 3 결과와 실제 배포 환경 결과를 같은 환경의 수치처럼 혼합하지 않음
 - Phase 4 artifact 생성
 - 실제 배포 환경 결과 문서 작성
 

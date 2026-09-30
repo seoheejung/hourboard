@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+deploy
+node_modules
+dist
+tests
+docs
+.project
+*.log
+*.tmp
+*.swp
+compose*.yaml

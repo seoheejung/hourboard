@@ -1,4 +1,6 @@
-# HourBoard Phase 4 — OCI Deployment 구현 지시서
+# HourBoard Phase 4A — OCI Deployment 구현 지시서
+
+이 지시서는 [Phase 4 계획](../../.project/plan.md#phase-4--production-deployment)의 OCI 경로에 적용한다. A1 capacity 부족이 계속되면 [Phase 4B 자체 호스팅 지침](phase4-self-hosted-deployment.md)을 따른다. 두 경로 모두 실제 외부 배포와 검증 전에는 Phase 4 완료로 기록하지 않는다.
 
 > 대상: OpenAI Codex
 
