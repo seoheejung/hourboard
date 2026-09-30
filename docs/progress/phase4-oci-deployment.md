@@ -69,6 +69,8 @@ OCI 시도 기록은 유지한다. 사용자는 [Phase 4B 지침](../instruction
 
 작업 PC에서 운영용 `compose.prod.yaml`, Traefik DNS-01, Fastify production bind, PostgreSQL volume, migration, Git에서 제외되는 단일 `deploy/production.env` 주입 경로와 DuckDNS updater를 준비했다. `npm run build`와 Compose 구성 검사는 통과했다. 작업 PC에는 Docker Engine이 없어 이미지 빌드 및 실제 PostgreSQL·HTTPS E2E는 수행하지 못했다.
 
-사용자가 미니PC에서 전달한 운영 기동 결과: `docker compose config --quiet` 성공, WSL Ubuntu의 Docker CLI로 운영 이미지를 빌드·기동했다. `db`는 healthy, `migrate`는 exit 0, `app`·`traefik`·`duckdns-updater`는 running이다. Compose 포트 표시는 Traefik의 host TCP 443 publish만 보여 주고, Windows listener 조회에서도 443만 확인됐다. 이 상태만으로 IPv4 loopback·LAN·외부 TCP 443 도달, 앱 응답, 신뢰되는 인증서, DuckDNS 갱신 성공은 판정하지 않는다.
+사용자가 미니PC에서 전달한 운영 기동 결과: `docker compose config --quiet` 성공, WSL Ubuntu의 Docker CLI로 운영 이미지를 빌드·기동했다. `db`는 healthy, `migrate`는 exit 0, `app`·`traefik`·`duckdns-updater`는 running이다. Compose 포트 표시는 Traefik의 host TCP 443 publish만 보여 주고, Windows listener 조회에서도 443만 확인됐다.
 
-다음 단계는 미니PC IPv4 loopback과 다른 LAN 기기에서 `hourboard.duckdns.org` Host로 실제 HTTPS·`/api/round` 응답과 인증서를 확인하는 것이다. 그 뒤 미니PC LAN IPv4 DHCP 예약, 공유기 TCP 443 포트포워딩, 외부망 HTTPS·E2E, production reboot와 latency를 검증한다. 직접 인바운드 TCP 443 도달 여부와 자동 복구는 아직 미검증이며 Phase 4B 완료로 기록하지 않는다.
+다른 LAN 기기에서 미니PC TCP 443 연결에 성공했고, `curl --resolve`로 `hourboard.duckdns.org`의 HTTPS `/health`와 `/api/round`가 모두 200을 반환했다. 두 경로 모두 실제 PostgreSQL query를 수행하므로 LAN 경로의 Traefik → Fastify → PostgreSQL 응답을 확인했다. `-k` 없이 TLS 연결에 성공해 해당 LAN PC의 인증서 신뢰 검사는 통과했지만, 인증서 발급자·유효기간 및 일반 외부 브라우저의 신뢰는 별도 검증 대상이다. 실제 LAN 주소는 기록하지 않는다.
+
+다음 단계는 DuckDNS updater 성공 상태 확인, 미니PC LAN IPv4 DHCP 예약, 공유기 TCP 443 포트포워딩, 외부망 HTTPS·E2E, production reboot와 latency 검증이다. 직접 인바운드 TCP 443 도달 여부와 자동 복구는 아직 미검증이며 Phase 4B 완료로 기록하지 않는다.
