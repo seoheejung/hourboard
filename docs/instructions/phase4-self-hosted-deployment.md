@@ -1,6 +1,6 @@
 # HourBoard Phase 4B — 자체 호스팅 미니PC 배포 지침
 
-**상태: Phase 4B 기본 배포 경로 / 미니PC·WAN 사전 확인 완료, TCP 443 실제 외부 도달 미검증.**
+**상태: 외부 HTTPS·Windows reboot 복구 확인 / 외부 E2E·latency 검증 전.** 실제 확인 결과는 [Phase 4B 진행 기록](../progress/phase4-self-hosted-deployment.md)에 둔다.
 
 이 문서는 [Phase 4 계획](../../.project/plan.md#phase-4--production-deployment)의 미니PC 경로에만 적용한다. OCI A1 시도와 capacity 실패의 사실 기록은 [OCI 진행 기록](../progress/phase4-oci-deployment.md)에 보존한다. Phase 4 완료 결과는 실제 배포와 검증 후 `docs/results/`에 작성한다.
 
@@ -8,7 +8,7 @@
 
 물리 서버는 EcoBe-A1 Mini PC(Intel N100 4C/4T, RAM 16GB)이며 Windows 11, WSL2 Ubuntu, Docker Desktop을 사용한다. 기존 Nginx와 자체 서명 인증서 기반 내부망 HTTPS 구성은 운영 경로에 포함하지 않는다.
 
-현재 미니PC에는 실행 중인 Docker 컨테이너가 없고 Windows의 TCP 80/443/3000/5432 listener도 없다. 기존 Nginx·Fastify·PostgreSQL의 설치 위치 자체는 별도 확인하지 않았으며 현재 포트 충돌은 확인되지 않았다.
+배포 전 미니PC에는 실행 중인 Docker 컨테이너와 Windows의 TCP 80/443/3000/5432 listener가 없었다. 운영 배포 후에는 Traefik의 TCP 443만 host에 publish했다.
 
 CPU TDP 6W를 장비 전체 실측 소비전력으로 사용하지 않는다.
 
@@ -39,26 +39,24 @@ CPU TDP 6W를 장비 전체 실측 소비전력으로 사용하지 않는다.
 | Architecture | x86_64 |
 | C: 전체 공간 | 237.4 GB |
 | C: 여유 공간 | 194 GB |
-| 실행 중 Docker 컨테이너 | 0 |
-| TCP 80 listener | 없음 |
-| TCP 443 listener | 없음 |
-| TCP 3000 listener | 없음 |
-| TCP 5432 listener | 없음 |
+| 배포 전 실행 중 Docker 컨테이너 | 0 |
+| 배포 전 TCP 80 listener | 없음 |
+| 배포 전 TCP 443 listener | 없음 |
+| 배포 전 TCP 3000 listener | 없음 |
+| 배포 전 TCP 5432 listener | 없음 |
 | DuckDNS A 레코드 | 현재 집 공인 IPv4로 정상 해석 |
 | 외부 관측 IPv4 | 작업 PC와 동일 |
 
 미니PC는 현재 Wi-Fi로 공유기에 연결되어 있다. 실제 LAN IPv4와 Gateway 값은 운영 설정에 필요할 때 로컬에서 확인하되 저장소 문서에는 기록하지 않는다.
 
-### 1.3 아직 미검증인 항목
+### 1.3 현재 남은 검증
 
-- 공유기 TCP 443 포트포워딩 후 실제 외부망에서 미니PC Traefik까지 도달하는지 여부
-- Windows 방화벽에서 TCP 443 inbound 허용 결과
-- Traefik DNS-01 인증서 발급 및 자동 갱신
-- 최종 운영 Compose의 PostgreSQL 영속성
-- Windows 재부팅 후 미로그인 상태의 Docker Desktop 및 컨테이너 자동 복구
-- 실제 외부 브라우저, E2E, latency
+- 인증서 발급자·유효기간과 자동 갱신의 별도 확인
+- PostgreSQL 컨테이너·volume 재생성에 대한 영속성 확인
+- GUI 로그인도 없는 완전 무인 부팅 복구 여부의 별도 판정
+- 실제 외부 브라우저의 등록·순위 흐름, 병렬 E2E, latency
 
-기존 Docker 기반 443 서비스가 없으므로 사전 reboot 실험은 수행하지 않는다. 자동 복구는 최종 운영 Compose 구성 후 production reboot에서 검증한다.
+기존 Docker 기반 443 서비스가 없어 사전 reboot 실험은 수행하지 않았다. 최종 운영 Compose로 Windows reboot 후 컨테이너와 외부 HTTPS가 복구된 결과는 [진행 기록](../progress/phase4-self-hosted-deployment.md)에 둔다.
 
 ---
 

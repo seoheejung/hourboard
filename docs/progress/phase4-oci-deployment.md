@@ -61,16 +61,4 @@ VM이 없으므로 OS 설치부터 외부 성능 측정까지는 미검증이다
 
 ## Phase 4B 자체 호스팅 기본 경로
 
-OCI 시도 기록은 유지한다. 사용자는 [Phase 4B 지침](../instructions/phase4-self-hosted-deployment.md)에 따라 `hourboard.duckdns.org` + DuckDNS + Traefik + Let's Encrypt DNS-01 + 미니PC 직접 TCP 443 인바운드를 기본 경로로 선택했다. Cloudflare Tunnel은 사용하지 않는다.
-
-사용자가 미니PC에서 확인해 전달한 사전 점검 결과: 공유기 WAN IPv4, 외부 관측 IPv4, DuckDNS A 레코드가 일치했다. 공유기 WAN에는 공인 IPv4가 직접 할당되어 CGNAT·이중 NAT 징후가 없었다. 미니PC의 Wi-Fi는 해당 공유기에 연결됐고, WSL2 Ubuntu 및 Docker Desktop Linux Engine이 실행 중이었다. C: 전체 237.4 GB 중 194 GB가 비어 있었으며, 점검 당시 실행 중인 Docker 컨테이너와 Windows의 80/443/3000/5432 listener는 없었다. 실제 IP 주소와 사용자별 경로는 저장소에 기록하지 않는다.
-
-기존 Docker 기반 443 서비스가 없어 사전 미로그인 재부팅 시험은 수행하지 않았다. 이 결과는 실패가 아니라 미검증이다. 현재 DuckDNS 자동 갱신 주체도 없다고 사용자가 확인했으므로 운영 Compose의 `duckdns-updater`를 기본 서비스로 준비했다.
-
-작업 PC에서 운영용 `compose.prod.yaml`, Traefik DNS-01, Fastify production bind, PostgreSQL volume, migration, Git에서 제외되는 단일 `deploy/production.env` 주입 경로와 DuckDNS updater를 준비했다. `npm run build`와 Compose 구성 검사는 통과했다. 작업 PC에는 Docker Engine이 없어 이미지 빌드 및 실제 PostgreSQL·HTTPS E2E는 수행하지 못했다.
-
-사용자가 미니PC에서 전달한 운영 기동 결과: `docker compose config --quiet` 성공, WSL Ubuntu의 Docker CLI로 운영 이미지를 빌드·기동했다. `db`는 healthy, `migrate`는 exit 0, `app`·`traefik`·`duckdns-updater`는 running이다. Compose 포트 표시는 Traefik의 host TCP 443 publish만 보여 주고, Windows listener 조회에서도 443만 확인됐다.
-
-다른 LAN 기기에서 미니PC TCP 443 연결에 성공했고, `curl --resolve`로 `hourboard.duckdns.org`의 HTTPS `/health`와 `/api/round`가 모두 200을 반환했다. 두 경로 모두 실제 PostgreSQL query를 수행하므로 LAN 경로의 Traefik → Fastify → PostgreSQL 응답을 확인했다. `-k` 없이 TLS 연결에 성공해 해당 LAN PC의 인증서 신뢰 검사는 통과했지만, 인증서 발급자·유효기간 및 일반 외부 브라우저의 신뢰는 별도 검증 대상이다. 실제 LAN 주소는 기록하지 않는다.
-
-다음 단계는 DuckDNS updater 성공 상태 확인, 미니PC LAN IPv4 DHCP 예약, 공유기 TCP 443 포트포워딩, 외부망 HTTPS·E2E, production reboot와 latency 검증이다. 직접 인바운드 TCP 443 도달 여부와 자동 복구는 아직 미검증이며 Phase 4B 완료로 기록하지 않는다.
+OCI 시도 기록은 이 문서에 보존한다. 미니PC의 실제 배포·외부 HTTPS·Windows reboot 검증과 남은 E2E·latency 작업은 [Phase 4B 자체 호스팅 진행 기록](phase4-self-hosted-deployment.md)에 분리했다. Phase 4B는 아직 완료로 기록하지 않는다.

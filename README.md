@@ -218,7 +218,7 @@ flowchart LR
 
 개발 환경에서는 Fastify와 Docker Compose PostgreSQL을 로컬에서 실행한다.
 
-### Phase 4B 운영 목표
+### Phase 4B 운영 배포
 
 ```mermaid
 flowchart LR
@@ -254,7 +254,15 @@ hourboard.duckdns.org
 → PostgreSQL
 ```
 
-현재 미니PC에서 Windows 11, WSL2 Ubuntu, Docker Desktop Linux Engine, x86_64 환경과 충분한 저장 공간을 확인했다. 현재 TCP 80/443/3000/5432 listener와 실행 중인 Docker 컨테이너가 없는 상태에서 Phase 4B 배포를 준비하고 있다.
+[운영 사이트 열기](https://hourboard.duckdns.org/)
+
+미니PC에서 운영 Compose를 기동했고, 외부 LTE/5G에서 HTTPS 화면과 API 접속을 확인했다. Windows 재부팅 후에도 컨테이너와 외부 HTTPS가 복구되고 이전 Winner·attemptCount가 유지됐다. 외부 동시 등록 E2E와 latency 측정은 진행 전이다.
+
+운영 화면:
+
+| Winner 표시 | 등록 가능 상태 |
+| --- | --- |
+| <img src="docs/image/Screenshot_1.png" alt="HourBoard 모바일 화면의 Winner 전광판" width="280"> | <img src="docs/image/Screenshot_2.png" alt="HourBoard 모바일 화면의 등록 가능 상태" width="280"> |
 
 ### Phase 4A OCI 시도
 
@@ -480,7 +488,7 @@ Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, �
 
 #### Phase 4B — 자체 호스팅 미니PC
 
-현재 기본 배포 경로다.
+현재 운영 중인 기본 배포 경로다. [운영 사이트](https://hourboard.duckdns.org/)와 [Phase 4B 진행 기록](docs/progress/phase4-self-hosted-deployment.md)에서 실제 확인 범위를 볼 수 있다.
 
 물리 환경:
 
@@ -494,7 +502,7 @@ Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, �
 | Linux Environment | WSL2 Ubuntu |
 | Container Runtime | Docker Desktop |
 
-사전 확인 완료:
+확인 완료:
 
 - 공유기 WAN IPv4와 외부 관측 IPv4 일치
 - DuckDNS A 레코드 정상 해석
@@ -502,23 +510,19 @@ Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, �
 - 미니PC Windows 11 / WSL2 / Docker Desktop 확인
 - Docker Linux Engine / x86_64 확인
 - 운영 배포에 충분한 저장 공간 확인
-- 현재 실행 중 Docker 컨테이너 없음
-- 현재 TCP 80/443/3000/5432 listener 없음
 - Phase 4B 운영 구성 작성 및 작업 PC 정적 검증 완료
 - 운영 구성 커밋 및 `origin/main` 반영 완료
+- 미니PC에서 운영 Compose build 및 app·PostgreSQL·Traefik·DuckDNS updater 기동
+- migration 정상 종료, PostgreSQL healthy
+- host TCP 443만 publish, 앱·DB 포트 비공개
+- DHCP 예약과 공유기 TCP 443 포트포워딩
+- LAN 및 외부 LTE/5G HTTPS 화면·API 응답
+- Windows reboot 후 컨테이너와 외부 HTTPS 복구
+- reboot 전후 Winner·attemptCount 유지
 
 남은 검증:
 
-- 미니PC에서 운영 Compose 실제 build
-- PostgreSQL / Fastify / Traefik 실제 기동
-- DuckDNS updater
-- Let's Encrypt DNS-01
-- 공유기 TCP 443 포트포워딩
-- Windows 방화벽
-- 실제 외부 HTTPS
-- production reboot
-- DB persistence
-- 실제 브라우저 흐름
+- 외부 실제 브라우저의 등록·순위 흐름
 - 외부 E2E
 - 외부 RTT 및 p50 / p95 / p99
 
@@ -537,6 +541,7 @@ hourboard/
 ├─ deploy/
 │  └─ production.env.example
 ├─ docs/
+│  ├─ image/
 │  ├─ instructions/
 │  ├─ progress/
 │  └─ results/
@@ -580,3 +585,4 @@ hourboard/
 | `docs/results/*` | 완료된 구현·검증 결과 |
 | `docs/instructions/phase4-self-hosted-deployment.md` | Phase 4B 미니PC 배포·검증 지침 |
 | `docs/progress/phase4-oci-deployment.md` | OCI Phase 4A 시도와 capacity 결과 |
+| `docs/progress/phase4-self-hosted-deployment.md` | Phase 4B 실제 배포와 남은 검증 |
