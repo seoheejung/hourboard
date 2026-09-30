@@ -1,6 +1,7 @@
 # HourBoard
 
-> **한 시간 동안 띄워드립니다**
+### [**한 시간 동안 띄워드립니다**](https://hourboard.duckdns.org/)
+
 >
 > 매 정각 가장 먼저 등록된 한 문구를 한 시간 동안 노출하고, 첫 등록 후 10초 안의 참가자에게 서버 처리 기준 순위를 반환하는 선착순 동시성 실험 서비스
 
@@ -253,8 +254,6 @@ hourboard.duckdns.org
 → Fastify
 → PostgreSQL
 ```
-
-[운영 사이트 열기](https://hourboard.duckdns.org/)
 
 미니PC에서 운영 Compose를 기동했고, 외부 LTE/5G에서 HTTPS 화면과 API 접속을 확인했다. Windows 재부팅 후에도 컨테이너와 외부 HTTPS가 복구되고 이전 Winner·attemptCount가 유지됐다. 외부 동시 등록 E2E와 latency 측정은 진행 전이다.
 
