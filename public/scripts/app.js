@@ -293,7 +293,7 @@ form.addEventListener('submit', async (event) => {
             void syncRound();
         }
         else if (!response.ok && data.code === 'INVALID_REQUEST') {
-            showResult('error', '입력을 확인해 주세요.', '한 줄의 문구를 1~120자로 입력해 주세요.');
+            showResult('error', '입력을 확인해 주세요.', '문구를 1~120자로 입력해 주세요.');
         }
         else if (!response.ok && data.code === 'INVALID_SLOT') {
             showResult('error', '라운드 정보를 확인해 주세요.', '현재 라운드 정보를 다시 불러옵니다.');

@@ -17,7 +17,7 @@ export function registerAttempts(app: FastifyInstance, pool: pg.Pool) {
       const message = request.body.message.trim();
       if (!message || Array.from(message).length > 120 || /[\r\n\u2028\u2029]/u.test(message)) {
         reply.code(400);
-        return apiError('INVALID_REQUEST', '문구는 한 줄의 1~120자여야 합니다.');
+        return apiError('INVALID_REQUEST', '문구는 1~120자여야 합니다.');
       }
       const now = Date.now();
       if (now < slot.getTime()) {
