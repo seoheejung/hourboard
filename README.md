@@ -285,13 +285,13 @@ OCI Japan East (Tokyo) A1 Flex를 무료 배포 후보로 검증했으나 Comput
 
 ---
 
-## 환경 변수
+## 로컬 개발 환경 변수
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `NODE_ENV` | Yes | 실행 환경 구분 |
 | `PORT` | Yes | Fastify 서버 포트 |
-| `DATABASE_URL` | Yes | PostgreSQL 연결 문자열 |
+| `DATABASE_URL` | Yes | 로컬 개발용 PostgreSQL 연결 문자열 |
 
 `.env`는 저장소에 커밋하지 않는다.
 
@@ -304,6 +304,8 @@ DATABASE_URL=postgresql://hourboard:hourboard@localhost:5432/hourboard
 ```
 
 운영 환경에서는 별도의 PostgreSQL 계정과 비밀번호를 사용하며 기본 비밀번호를 코드에 포함하지 않는다.
+
+Phase 4B 운영 설정은 Git에서 제외된 `deploy/production.env`의 `ACME_EMAIL`, `POSTGRES_PASSWORD`, `DUCKDNS_TOKEN`을 사용한다. 실제 값의 설정 방법은 [Phase 4B 배포 지침](docs/instructions/phase4-self-hosted-deployment.md)을 따른다.
 
 ---
 
