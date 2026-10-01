@@ -17,7 +17,7 @@ body { min-height: 100dvh; margin: 0; padding: 16px; display: grid; place-items:
 .brand:hover { color: #9aecb6; }
 .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #466358; border-radius: 8px; background: #203129; color: #adff96; font: 800 1.2rem/1 ui-monospace, Consolas, monospace; letter-spacing: 0; }
 .header-tagline { min-width: 0; margin: 0; color: #a8bbb5; font-size: .72rem; font-weight: 750; letter-spacing: .04em; text-align: right; overflow-wrap: anywhere; }
-h1 { font-size: clamp(1.45rem, 3vw, 2rem); line-height: 1.08; letter-spacing: -.07em; white-space: nowrap; margin: 0; font-weight: 850; }
+h1 { font-size: clamp(1.45rem, 3vw, 2rem); line-height: 1.08; letter-spacing: -.07em; overflow-wrap: anywhere; margin: 0; font-weight: 850; }
 .intro { color: #aebfba; line-height: 1.45; margin: 10px 0 0; font-size: .74rem; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 h2 { margin: 0; font-size: 1.03rem; letter-spacing: -.025em; }

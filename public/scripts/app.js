@@ -12,6 +12,7 @@ const countdown = element('countdown');
 const roundStatus = element('round-status');
 const form = element('attempt-form');
 const input = element('message-input');
+const messageHint = element('message-hint');
 const remaining = element('remaining');
 const submitButton = element('submit-button');
 const result = element('result');
@@ -24,6 +25,7 @@ let round = null;
 let targetSlotAt = null;
 let registrationClosesAt = null;
 let localWinner = null;
+let successfulSlotAt = null;
 let pending = false;
 let syncInFlight = false;
 let openStateInFlight = false;
@@ -39,7 +41,7 @@ function validMessage() {
     return value.trim().length > 0 && Array.from(value).length <= MAX_MESSAGE_LENGTH && !/[\r\n\u2028\u2029]/u.test(value);
 }
 function canSubmit() {
-    if (!targetSlotAt || round?.currentSlot.registrationOpen === false || pending || !validMessage())
+    if (!targetSlotAt || successfulSlotAt === targetSlotAt || round?.currentSlot.registrationOpen === false || pending || !validMessage())
         return false;
     const now = serverNow();
     const start = Date.parse(targetSlotAt);
@@ -107,6 +109,7 @@ function applyRound(next) {
     round = next;
     if (previousSlot && previousSlot !== next.currentSlot.startsAt) {
         localWinner = null;
+        successfulSlotAt = null;
         registrationClosesAt = null;
         openStateError = false;
         boundaryRetryCount = 0;
@@ -214,11 +217,13 @@ function tick() {
     const remainingMs = Math.max(0, Date.parse(round.nextSlotAt) - now);
     const registrationClosed = round.currentSlot.registrationOpen === false
         || (registrationClosesAt !== null && now >= Date.parse(registrationClosesAt));
-    submitButton.hidden = registrationClosed && remainingMs > BUTTON_PREVIEW_MS;
-    if (submitButton.hidden && !pending && clearedClosedSlotAt !== round.currentSlot.startsAt) {
+    const submittedThisRound = successfulSlotAt === round.currentSlot.startsAt;
+    submitButton.hidden = submittedThisRound || (registrationClosed && remainingMs > BUTTON_PREVIEW_MS);
+    if (submitButton.hidden && !submittedThisRound && !pending && clearedClosedSlotAt !== round.currentSlot.startsAt) {
         clearedClosedSlotAt = round.currentSlot.startsAt;
         input.value = '';
         remaining.textContent = `${MAX_MESSAGE_LENGTH}자 남음`;
+        messageHint.textContent = '문구를 미리 입력할 수 있습니다.';
         input.setAttribute('aria-invalid', 'false');
         result.replaceChildren();
         delete result.dataset.state;
@@ -228,6 +233,8 @@ function tick() {
     countdown.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     if (pending)
         roundStatus.textContent = '등록 결과를 기다리는 중입니다.';
+    else if (submittedThisRound)
+        roundStatus.textContent = '등록이 완료되었습니다. 다음 정각에 다시 참여할 수 있습니다.';
     else if (roundError)
         roundStatus.textContent = '전광판 갱신이 지연되고 있습니다.';
     else if (openStateError && !registrationClosesAt)
@@ -256,7 +263,9 @@ function updateInputCount() {
     if (characters.length > MAX_MESSAGE_LENGTH)
         input.value = characters.slice(0, MAX_MESSAGE_LENGTH).join('');
     remaining.textContent = `${MAX_MESSAGE_LENGTH - Array.from(input.value).length}자 남음`;
-    input.setAttribute('aria-invalid', 'false');
+    const invalid = input.value.length > 0 && !validMessage();
+    input.setAttribute('aria-invalid', String(invalid));
+    messageHint.textContent = invalid ? '공백만 입력하거나 줄을 바꿀 수 없습니다.' : '문구를 미리 입력할 수 있습니다.';
     tick();
 }
 input.addEventListener('input', event => {
@@ -277,8 +286,13 @@ form.addEventListener('submit', async (event) => {
             method: 'POST', headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ slotAt, message })
         });
+        if (response.status === 429) {
+            showResult('error', '요청이 많습니다.', '잠시 후 다시 등록해 주세요.');
+            return;
+        }
         const data = await response.json();
         if (response.ok && data.slotAt === slotAt && data.code === 'WINNER' && data.position === 1 && data.winner === true) {
+            successfulSlotAt = slotAt;
             if (round?.currentSlot.startsAt === slotAt && data.registrationClosesAt)
                 registrationClosesAt = data.registrationClosesAt;
             showResult('winner', '축하합니다!', data.message);
@@ -287,12 +301,15 @@ form.addEventListener('submit', async (event) => {
                 showBoardMessage(message);
         }
         else if (response.ok && data.slotAt === slotAt && data.code === 'RANKED' && Number.isInteger(data.position) && data.position >= 2 && data.winner === false) {
+            successfulSlotAt = slotAt;
             if (round?.currentSlot.startsAt === slotAt && data.registrationClosesAt)
                 registrationClosesAt = data.registrationClosesAt;
             showResult('ranked', '아쉽군요!', data.message);
             void syncRound();
         }
         else if (!response.ok && data.code === 'INVALID_REQUEST') {
+            input.setAttribute('aria-invalid', 'true');
+            messageHint.textContent = '문구를 1~120자로 입력해 주세요.';
             showResult('error', '입력을 확인해 주세요.', '문구를 1~120자로 입력해 주세요.');
         }
         else if (!response.ok && data.code === 'INVALID_SLOT') {

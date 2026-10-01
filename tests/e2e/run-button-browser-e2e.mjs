@@ -140,24 +140,30 @@ try {
   await until(async () => evaluate("document.getElementById('result').dataset.state === 'winner'"));
   check('first registration shows WINNER', await evaluate("document.getElementById('result').textContent.includes('축하합니다!')"));
   check('winner copy says until the next hour', await evaluate("document.getElementById('result').textContent.includes('작성하신 문구를 다음 정각까지 띄워드립니다.')"));
+  check('winner submission immediately hides button and keeps result', await evaluate("document.getElementById('submit-button').hidden && document.getElementById('submit-button').disabled && document.getElementById('result').dataset.state === 'winner' && document.getElementById('round-status').textContent === '등록이 완료되었습니다. 다음 정각에 다시 참여할 수 있습니다.'"));
   const openedRound = await (await fetch(`${base}/api/round`)).json();
   const firstRow = await pool.query('SELECT created_at FROM hour_slots WHERE slot_start = $1', [slotAt]);
   const closesAt = openedRound.currentSlot.registrationClosesAt;
   check('first registration opens ten-second window', openedRound.currentSlot.registrationOpen === true
     && Number.isFinite(Date.parse(closesAt))
     && Date.parse(closesAt) === Math.min(firstRow.rows[0].created_at.getTime() + 10_000, Date.parse(openedRound.currentSlot.endsAt)));
-  check('browser displays open window countdown', await evaluate("/^등록 마감까지 [1-9][0-9]?초$/.test(document.getElementById('round-status').textContent)"));
   artifact.registrationClosesAt = closesAt;
 
+  await send('Page.navigate', { url: base });
+  await until(async () => evaluate("/^등록 마감까지 [1-9][0-9]?초$/.test(document.getElementById('round-status')?.textContent ?? '')"));
+  check('another visit can register during the open window', await evaluate("!document.getElementById('submit-button').hidden"));
   check('valid message enables button with winner', !(await type('browser-second')));
   await evaluate("document.getElementById('submit-button').click()");
   await until(async () => evaluate("document.getElementById('result').dataset.state === 'ranked'"));
   check('subsequent registration shows RANKED position 2 once', await evaluate("(document.getElementById('result').textContent.match(/2번째/g) ?? []).length === 1"));
   check('ranked card has no redundant support line', await evaluate("!document.getElementById('result').textContent.includes('서버 처리 기준 순위입니다.')"));
+  check('ranked submission immediately hides button and keeps result', await evaluate("document.getElementById('submit-button').hidden && document.getElementById('submit-button').disabled && document.getElementById('result').dataset.state === 'ranked' && document.getElementById('round-status').textContent === '등록이 완료되었습니다. 다음 정각에 다시 참여할 수 있습니다.'"));
   const screenshot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await mkdir('tests/e2e/artifacts', { recursive: true });
   await writeFile('tests/e2e/artifacts/button-ranked-mobile.png', Buffer.from(screenshot.data, 'base64'));
 
+  await send('Page.navigate', { url: base });
+  await until(async () => evaluate("/^등록 마감까지 [1-9][0-9]?초$/.test(document.getElementById('round-status')?.textContent ?? '')"));
   await evaluate(`(() => {
     window.__postCalls = 0;
     const originalFetch = window.fetch;
@@ -168,6 +174,7 @@ try {
     };
   })()`);
   check('valid third message enables button', !(await type('browser-third')));
+  const activeButtonBottom = await evaluate("document.getElementById('submit-button').getBoundingClientRect().bottom");
   await evaluate("document.getElementById('submit-button').click()");
   const pendingState = await evaluate("({ disabled: document.getElementById('submit-button').disabled, calls: window.__postCalls })");
   await evaluate("document.getElementById('submit-button').click()");
@@ -180,10 +187,12 @@ try {
     const originalTarget = targetSlotAt;
     const originalOffset = serverOffsetMs;
     const originalClose = registrationClosesAt;
+    const originalSuccess = successfulSlotAt;
     const originalBoundary = observedBoundary;
     const button = document.getElementById('submit-button');
     observedBoundary = round.nextSlotAt;
     registrationClosesAt = null;
+    successfulSlotAt = null;
     targetSlotAt = new Date(serverNow() + 60_000).toISOString();
     tick();
     const beforeStartDisabled = button.disabled;
@@ -196,6 +205,7 @@ try {
     targetSlotAt = originalTarget;
     serverOffsetMs = originalOffset;
     registrationClosesAt = originalClose;
+    successfulSlotAt = originalSuccess;
     observedBoundary = originalBoundary;
     tick();
     return { beforeStartDisabled, atStartEnabled, afterEndDisabled };
@@ -203,9 +213,8 @@ try {
   check('slot clock gates registration in browser', timing.beforeStartDisabled && timing.atStartEnabled && timing.afterEndDisabled);
   artifact.clockCheck = 'Browser clock offset simulated; actual hour boundary was not awaited';
 
-  const activeButtonBottom = await evaluate("document.getElementById('submit-button').getBoundingClientRect().bottom");
-  await until(async () => evaluate("document.getElementById('submit-button').disabled && /등록이 마감|다음 정각에 등록 버튼/.test(document.getElementById('round-status').textContent)"), 160);
-  check('button disables after real ten-second window', await evaluate('serverNow() >= Date.parse(registrationClosesAt)'));
+  await until(async () => evaluate('serverNow() >= Date.parse(registrationClosesAt)'), 160);
+  check('own button stays hidden after real ten-second window', await evaluate("document.getElementById('submit-button').hidden && document.getElementById('submit-button').disabled && document.getElementById('result').dataset.state === 'ranked'"));
   const preview = await evaluate(`(() => {
     const oldOffset = serverOffsetMs;
     const oldOpen = round.currentSlot.registrationOpen;
@@ -217,17 +226,16 @@ try {
     const hiddenBeforeFiveMinutes = button.hidden && button.disabled;
     serverOffsetMs = start - 299_900 - Date.now();
     tick();
-    const visibleAtFiveMinutes = !button.hidden && button.disabled;
+    const hiddenAtFiveMinutes = button.hidden && button.disabled;
     serverOffsetMs = start - 1_000 - Date.now();
     tick();
-    const disabledOneSecondBefore = !button.hidden && button.disabled;
+    const hiddenOneSecondBefore = button.hidden && button.disabled;
     serverOffsetMs = oldOffset;
     round.currentSlot.registrationOpen = oldOpen;
     tick();
-    return { hiddenBeforeFiveMinutes, visibleAtFiveMinutes, disabledOneSecondBefore };
+    return { hiddenBeforeFiveMinutes, hiddenAtFiveMinutes, hiddenOneSecondBefore };
   })()`);
-  check('button hides until five minutes before next hour', preview.hiddenBeforeFiveMinutes && preview.visibleAtFiveMinutes);
-  check('button remains disabled one second before next hour', preview.disabledOneSecondBefore);
+  check('own button stays hidden before the next hour', preview.hiddenBeforeFiveMinutes && preview.hiddenAtFiveMinutes && preview.hiddenOneSecondBefore);
   const lateResponse = await fetch(`${base}/api/attempts`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ slotAt, message: 'browser-late' })
@@ -283,9 +291,10 @@ try {
     tick();
     return { enabled: !document.getElementById('submit-button').disabled,
       visible: !document.getElementById('submit-button').hidden,
-      closeCleared: registrationClosesAt === null, newTarget: targetSlotAt === new Date(start).toISOString() };
+      closeCleared: registrationClosesAt === null, successCleared: successfulSlotAt === null,
+      newTarget: targetSlotAt === new Date(start).toISOString() };
   })()`);
-  check('next round enables button immediately at corrected boundary', nextRoundUi.enabled && nextRoundUi.visible && nextRoundUi.closeCleared && nextRoundUi.newTarget);
+  check('next round enables button immediately at corrected boundary', nextRoundUi.enabled && nextRoundUi.visible && nextRoundUi.closeCleared && nextRoundUi.successCleared && nextRoundUi.newTarget);
   artifact.clockCheck = 'Actual ten-second window awaited; hour transition simulated in browser and prior-round DB fixture';
   console.log('Browser registration E2E passed');
 } catch (error) {

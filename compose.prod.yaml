@@ -73,6 +73,16 @@ services:
       traefik.http.routers.hourboard.rule: "Host(`hourboard.duckdns.org`)"
       traefik.http.routers.hourboard.entrypoints: websecure
       traefik.http.routers.hourboard.tls.certresolver: duckdns
+      traefik.http.routers.hourboard.service: hourboard
+      traefik.http.routers.hourboard-attempts.rule: "Host(`hourboard.duckdns.org`) && Path(`/api/attempts`) && Method(`POST`)"
+      traefik.http.routers.hourboard-attempts.entrypoints: websecure
+      traefik.http.routers.hourboard-attempts.priority: "100"
+      traefik.http.routers.hourboard-attempts.tls.certresolver: duckdns
+      traefik.http.routers.hourboard-attempts.service: hourboard
+      traefik.http.routers.hourboard-attempts.middlewares: hourboard-attempt-limit
+      traefik.http.middlewares.hourboard-attempt-limit.ratelimit.average: "30"
+      traefik.http.middlewares.hourboard-attempt-limit.ratelimit.period: 1s
+      traefik.http.middlewares.hourboard-attempt-limit.ratelimit.burst: "150"
       traefik.http.services.hourboard.loadbalancer.server.port: "3000"
     networks:
       - edge
