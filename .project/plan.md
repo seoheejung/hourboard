@@ -20,12 +20,14 @@ HourBoard는 정각에 동시에 몰리는 요청을 하나의 시간 슬롯에 
 3. 등록 요청은 목표 시간 슬롯이 실제로 시작된 뒤에만 허용한다.
 4. 해당 슬롯에서 PostgreSQL이 처음 확정한 요청 1건만 승자가 된다.
 5. 승자의 문구는 다음 정각 전까지 전광판에 노출한다.
-6. 첫 등록 전에는 등록을 허용하고, 첫 정상 등록부터 10초 미만 동안만 후속 등록을 허용한다.
-7. 모든 성공 요청은 `1, 2, 3 ... N` 형태의 고유 순위를 받는다.
-8. 순위 기준은 브라우저 클릭 시각이 아니라 서버와 PostgreSQL이 요청을 처리한 순서다.
-9. 한 HTTP 등록 요청을 한 번의 도전으로 취급한다.
-10. 초기 버전은 로그인, 사용자 계정, 과거 순위 복구를 제공하지 않는다.
-11. 전광판 문구에는 HTML을 허용하지 않고 일반 문자열만 저장·출력한다.
+6. 첫 등록 전에는 등록을 허용하고, 첫 정상 등록부터 10초 미만 동안만 서버가 후속 등록을 허용한다.
+7. `WINNER` 또는 `RANKED` 응답을 받은 현재 페이지 세션은 해당 Round에서 등록 버튼을 즉시 숨기고 추가 UI 제출을 막는다. 이 UI 상태는 다른 사용자의 10초 Registration Window를 닫지 않는다.
+8. 정상 등록 응답을 받은 현재 페이지에는 10초 마감 countdown을 표시하지 않고 결과 카드를 유지한다. 참여 완료 상태는 브라우저 영속 저장소에 저장하지 않아 새로고침 후 복원되지 않으며, 서버에 사용자 식별 기능이 없어 버튼이 다시 나타날 수 있다. 현재 페이지에서 다음 Round를 감지하면 참여 완료 상태를 초기화한다.
+9. 모든 성공 요청은 `1, 2, 3 ... N` 형태의 고유 순위를 받는다.
+10. 순위 기준은 브라우저 클릭 시각이 아니라 서버와 PostgreSQL이 요청을 처리한 순서다.
+11. 한 HTTP 등록 요청을 한 번의 도전으로 취급한다.
+12. 초기 버전은 로그인, 사용자 계정, 과거 순위 복구를 제공하지 않는다.
+13. 전광판 문구에는 HTML을 허용하지 않고 일반 문자열만 저장·출력한다.
 
 ### 사용자 문구
 
@@ -274,21 +276,23 @@ winner message mutation = 0
 #### Winner 응답
 ```json
 {
-  "slotAt": "2026-09-26T11:00:00.000Z",
+  "slotAt": "2026-09-26T10:00:00.000Z",
   "code": "WINNER",
   "message": "가장 먼저 등록하셨습니다. 작성하신 문구를 다음 정각까지 띄워드립니다.",
   "position": 1,
-  "winner": true
+  "winner": true,
+  "registrationClosesAt": "2026-09-26T10:00:10.000Z"
 }
 ```
 #### 2등 이후 응답
 ```json
 {
-  "slotAt": "2026-09-26T11:00:00.000Z",
+  "slotAt": "2026-09-26T10:00:00.000Z",
   "code": "RANKED",
   "message": "37번째로 등록하셨습니다.",
   "position": 37,
-  "winner": false
+  "winner": false,
+  "registrationClosesAt": "2026-09-26T10:00:10.000Z"
 }
 ```
 등록 성공 응답은 slotAt, code, message, position, winner, registrationClosesAt 구조를 공통으로 사용한다.
@@ -371,10 +375,50 @@ SELECT 존재 확인
 - request body 최대 크기 제한
 - 문구 길이 제한 적용
 - 빈 문자열 및 공백-only 문자열 거부
-- DB credential은 환경 변수로 관리
-- `.env` 커밋 금지
-- PostgreSQL 외부 공개 금지
-- production stack trace 클라이언트 노출 금지
+- DB credential과 DuckDNS token은 운영 환경 변수로 관리
+- `.env`, `deploy/production.env` 실제 값 commit 금지
+- PostgreSQL host port 공개 금지
+- Fastify host port 공개 금지
+- Production ingress는 Traefik TCP 443만 공개
+- Production stack trace 클라이언트 노출 금지
+- 프런트엔드 정적 파일에서 운영 secret 관련 문자열이 없어야 함
+- Production Traefik에서 `POST /api/attempts`에만 rate limit middleware 적용
+- Rate limit의 Production 실제 동작은 배포 후 별도 검증
+- Traefik dashboard public 노출 금지
+- 현재 Traefik은 Docker service discovery를 위해 `/var/run/docker.sock`을 read-only bind mount로 직접 사용함
+- Docker socket의 `:ro`는 Docker API 자체를 read-only로 제한하는 보안 경계로 취급하지 않음
+- Docker socket proxy 또는 다른 provider 방식으로의 보강은 별도 인프라 변경으로 검토하며, 검증 없이 즉시 Production에 적용하지 않음
+- Fastify container는 `node` 사용자 실행 상태를 유지
+- 공유기 DMZ 사용 금지
+- 80 / 3000 / 5432 포트포워딩 금지
+
+### Beta Web 품질 점검
+
+작업 PC 구현 기준:
+
+- 모바일 제목 줄바꿈·overflow 보정
+- 입력 오류 안내
+- HTTP `429` 사용자 안내
+- 페이지 title / Open Graph metadata
+- `og-image.png`
+- `robots.txt`
+- `sitemap.xml`
+- `/api` 미정의 경로 JSON 404
+- 전광판·버튼·disabled 상태 색상 대비 4.79:1 이상 확인
+
+작업 PC 검증 완료:
+
+- `npm run build`
+- Production Compose 설정 검사
+- 로컬 정적 파일·404 HTTP 확인
+- 프런트엔드 secret 관련 문자열 미검출
+
+Production 미검증:
+
+- 실제 브라우저 E2E
+- Production rate limit
+- Production 페이지 로드 속도
+- Beta UI/Web 품질 변경의 실제 배포
 
 ---
 
@@ -385,8 +429,12 @@ hourboard/
 │  └─ plan.md
 ├─ db/
 │  └─ migrations/
+├─ deploy/
+│  └─ production.env.example
 ├─ docs/
+│  ├─ image/
 │  ├─ instructions/
+│  ├─ progress/
 │  └─ results/
 ├─ src/
 │  ├─ config/
@@ -397,13 +445,20 @@ hourboard/
 │  └─ shared/
 ├─ public/
 │  ├─ scripts/
-│  └─ styles/
+│  ├─ styles/
+│  ├─ og-image.png
+│  ├─ robots.txt
+│  └─ sitemap.xml
 ├─ tests/
 │  └─ e2e/
 │     └─ artifacts/
 ├─ k6/
 │  ├─ scenarios/
 │  └─ results/
+├─ .env.example
+├─ compose.yaml
+├─ compose.prod.yaml
+├─ Dockerfile.prod
 ├─ .gitignore
 ├─ AGENTS.md
 ├─ DESIGN.md
@@ -425,7 +480,9 @@ hourboard/
 | `tests/e2e/artifacts/` | 반복 가능한 E2E 결과 아티팩트 |
 | `k6/scenarios/` | 부하 테스트 시나리오 |
 | `k6/results/` | k6 원본·요약 결과 |
+| `deploy/` | Production 환경 변수 key template 및 배포 보조 파일 |
 | `docs/instructions/` | 현재 Phase 구현 지침 |
+| `docs/progress/` | 진행 중인 배포·인프라 검증 사실 기록 |
 | `docs/results/` | 완료된 Phase 구현·검증 결과 |
 
 구현 전 단계에서는 디렉토리만 유지하고 미완성 소스 파일을 선행 생성하지 않는다.
@@ -434,9 +491,9 @@ hourboard/
 
 ## 현재 구현 기준
 
-Phase 1과 Phase 2 MVP 구현 및 이후 확인된 수정 사항은 적용 완료된 상태를 기준으로 한다.
+Phase 1과 Phase 2 MVP 구현 및 이후 확인된 수정 사항을 기준으로 한다. 최근 Beta UI/Web 품질 변경과 등록 성공 후 버튼 처리 변경은 작업 PC에 구현됐지만 아직 Production 배포 전이므로 운영 완료 사실과 구분한다.
 
-이 문서에서 앞으로 구현 대상으로 관리하는 범위는 **Phase 4**다.
+이 문서에서 앞으로 검증·배포 대상으로 관리하는 범위는 **Phase 4**다.
 
 Phase 1·2·3의 실제 구현 사실과 검증 이력은 `docs/results/*`를 우선하며, Phase 4에서 기존 동작을 임의로 되돌리거나 재설계하지 않는다.
 
@@ -462,17 +519,22 @@ Phase 3 작업에서 Phase 1 동시성 semantics를 임의로 변경하지 않�
 - server time 기반 countdown
 - 문구 사전 입력
 - 등록 버튼 상태 처리
-- 첫 등록 후 10초 Registration Window
+- 서버의 첫 등록 후 10초 Registration Window
 - `REGISTRATION_CLOSED`
-- 등록 마감 후 버튼 숨김 및 다음 Round 준비
 - Winner / Ranked 결과 UI
+- `WINNER` 또는 `RANKED` 성공 응답을 받은 현재 페이지 세션에서 등록 버튼 즉시 숨김·비활성화
+- 정상 등록 응답을 받은 현재 페이지에 Registration Window countdown 미표시
+- 등록 성공 결과 카드 유지
+- 다른 브라우저의 10초 Registration Window는 서버 규칙대로 유지
+- 새로고침 시 참여 완료 상태 미복원·서버 사용자 식별 없음
+- 현재 페이지에서 다음 Round 감지 시 참여 완료 상태 초기화
 - 오류 및 결과 미확정 UI
 - 모바일 및 접근성 처리
 - 실제 로컬 실행 경로 검증
 
-기존 구현과 검증 결과는 `docs/results/phase2-ticketing-ui.md` 및 이후 MVP 수정 이력을 기준으로 한다.
+최근 UI 변경은 build와 E2E script syntax 검사를 통과했다. 현재 작업 환경에는 PostgreSQL과 Chrome CDP가 없어 수정된 성공 후 버튼 흐름의 실제 브라우저 E2E는 아직 실행하지 못했다.
 
-Phase 3에서 위 기능을 다시 설계하지 않는다.
+기존 구현과 검증 결과는 `docs/results/phase2-ticketing-ui.md` 및 이후 MVP 수정 이력을 기준으로 한다.
 
 ### Phase 3 — Load, Race & Open-State Verification
 
@@ -489,62 +551,120 @@ Phase 3에서 위 기능을 다시 설계하지 않는다.
 
 ### Phase 4 — Production Deployment
 
-**상태: 지금 작업**
+**상태: 진행 중**
 
 Phase 3 로컬 baseline을 수정하지 않고 비교 기준으로 사용한다. 실제 외부 환경에서 배포·복구·보안·latency를 검증한다.
 
-**Phase 4A — OCI Tokyo A1 시도:** OCI 계정 Home Region은 **Japan East (Tokyo)**, Region identifier는 **`ap-tokyo-1`**이다. VCN과 Terraform Stack을 만들고 Plan·Apply를 실행했으나 A1 host capacity 부족으로 Compute VM 생성에 실패했다. 실제 시도 기록은 [Phase 4 OCI 진행 기록](../docs/progress/phase4-oci-deployment.md)에 보존한다. OCI를 다시 시도할 때의 기준은 `docs/instructions/phase4-oci-deployment.md`를 따른다.
+**Phase 4A — OCI Tokyo A1 시도:** OCI 계정 Home Region은 **Japan East (Tokyo)**, Region identifier는 **`ap-tokyo-1`**이다. VCN과 Terraform Stack을 만들고 Plan·Apply를 실행했으나 A1 host capacity 부족으로 Compute VM 생성에 실패했다. 유료 shape 또는 다른 Region으로 자동 전환하지 않고 기록만 보존한다.
 
-**Phase 4B — 자체 호스팅 기본 경로:** EcoBe-A1 미니PC에서 Windows 11과 Docker Desktop을 유지하고 `hourboard.duckdns.org`를 최종 운영 주소로 사용한다. DuckDNS가 집 공인 IPv4를 가리키고, 공유기의 TCP 443 포트포워딩이 미니PC의 Traefik에 연결된다. Traefik은 Fastify로 전달하고 Let's Encrypt DNS-01과 DuckDNS TXT API로 인증서를 발급·갱신한다. DuckDNS updater는 변경되는 공인 IPv4를 갱신한다. 사용자 제공 장비 정보는 Intel N100(4C/4T), RAM 16GB이며 현재 WSL2 Ubuntu·Nginx와 자체 서명 인증서 기반 내부망 HTTPS를 사용한다. 기존 Nginx·Fastify·PostgreSQL의 실제 실행 위치와 연결 방식은 미확인이고, 기존 내부망 HTTPS는 외부 공개 배포 결과가 아니다. 운영 Compose 구성 전 미니PC 저장 공간·Docker backend·기존 443 listener와 앱 경로, 공유기 WAN IPv4와 외부 관측 IPv4 일치 여부, CGNAT·이중 NAT 여부, TCP 443 포트포워딩 가능 여부를 확인한다. 직접 인바운드가 불가능하면 이 경로를 배포 성공으로 간주하지 않고 전제 해결 또는 계획 변경을 먼저 판단한다. 기존 Docker 기반 HourBoard 경로가 있으면 로그인 없는 Windows 재부팅 후 다른 LAN 기기의 응답을 사전 시험한다. 경로가 없으면 사전 자동 복구는 미검증으로 남긴다. Traefik과 Fastify는 `edge`, Fastify와 PostgreSQL은 `data` Docker network를 공유한다. Traefik의 TCP 443만 호스트에 publish하고 Fastify·PostgreSQL·Traefik dashboard 포트는 공개하지 않는다. 기존 Nginx는 전환 전 현황을 확인하고 TCP 443 충돌을 해소한다. 구성·검증 기준은 `docs/instructions/phase4-self-hosted-deployment.md`를 따른다.
+**Phase 4B — 자체 호스팅 기본 경로:** EcoBe-A1 미니PC의 Windows 11 + Docker Desktop Linux Engine을 실제 Production host로 사용한다. 운영 주소는 `hourboard.duckdns.org`이며 DuckDNS → 공유기 TCP 443 → Traefik → Fastify → PostgreSQL 경로로 운영한다.
 
-Phase 4B의 자동 복구는 **필수 검증 대상**이며 성공 자체는 완료 조건이 아니다. 최종 운영 구성에서 미로그인 재부팅 실험이 실패하면 실패 시점, 로그인 전 서비스 상태, 수동 복구 방법, 재접속 결과와 운영 제약을 기록한다. 외부 HTTPS·보안 포트·DB 데이터 보존·핵심 E2E 등 나머지 완료 기준을 충족하면 자동 복구 실패를 명시한 상태로 Phase 4B를 완료할 수 있다. OCI 경로의 systemd 자동 복구 성공 기준은 유지한다.
+현재 실제 운영 구성:
+```text
+Internet
+→ hourboard.duckdns.org
+→ DuckDNS / 공인 IPv4
+→ 공유기 TCP 443
+→ Windows 11 Mini PC
+→ Docker Desktop Linux Engine
+→ Traefik
+→ Fastify
+→ PostgreSQL
+```
+확인 완료:
 
-두 경로 중 실제 배포한 경로에서 아래 공통 완료 기준을 검증한다. OCI 시도만으로 Phase 4 완료 상태로 이동하지 않는다.
+- Docker Desktop / Linux Engine / x86_64
+- Traefik / Fastify / PostgreSQL / migration / DuckDNS updater 운영 Compose
+- PostgreSQL healthy
+- migration `Exited (0)`
+- Fastify container 기동
+- DuckDNS updater 갱신 성공
+- Traefik host TCP 443 publish
+- Fastify 3000 / PostgreSQL 5432 host 미공개
+- DHCP 예약 및 공유기 TCP 443 포트포워딩
+- LAN HTTPS `/health`, `/api/round`
+- 외부 LTE/5G HTTPS 및 실제 UI 접근
+- Let's Encrypt 인증서 기반 HTTPS
+- Windows reboot 후 container 자동 복구
+- reboot 후 외부 HTTPS 및 `GET /api/round` 복구
+- reboot 전후 Winner·attemptCount 유지로 host reboot 기준 DB persistence 확인
+- Windows AC 자동 절전 비활성 확인
+- 최근 Kernel-Power Event 42 없음 확인
+- 장애 분석용 정상 상태 incident baseline 수집
 
-범위:
+현재 보안 확인:
 
-- OCI 경로: 계정·Home Region·무료 eligibility·quota를 확인하고 유료 리소스로 임의 전환하지 않음
-- 미니PC 경로: 저장 공간·Docker backend·기존 443 경로·가능하면 미로그인 reboot 사전 실험, 공유기 WAN IPv4와 외부 관측 IPv4 일치 여부·CGNAT·이중 NAT·TCP 443 포트포워딩 가능 여부를 운영 Compose 구성 전에 확인
-- 선택한 호스트와 컨테이너의 OS 및 architecture 확인
-- Node.js 24 LTS 실행 환경 구성
-- PostgreSQL 18.x 실행 환경 구성
-- production DB / user 구성
-- application deployment
-- OCI 경로: systemd service / 미니PC 경로: Docker Desktop·컨테이너 재시작 정책
-- PostgreSQL은 loopback 또는 컨테이너 내부 네트워크로 제한
-- application internal port 외부 비공개
-- 운영 환경 변수와 비밀값을 개발용 `compose.yaml`과 분리
-- production에서 저장소 `.env` fallback 비의존 확인
-- HTTPS
-- production 최소 structured error logging
-- OCI 경로: reboot 자동 복구 / 미니PC 경로: 사전·최종 reboot 실험과 자동 복구 성공·실패 기록
-- DB data persistence
-- 실제 외부 환경 E2E
-- Winner / Position / 10초 Registration Window 핵심 Registration Race 재검증
-- 실제 브라우저 핵심 흐름 검증
-- 외부 RTT 및 등록 latency 측정
-- Phase 3 로컬 baseline과 Phase 4 실제 배포 환경 결과를 환경별로 분리 기록
+- host publish는 Traefik TCP 443만 존재
+- Fastify container는 `node` 사용자 실행
+- Traefik은 Docker service discovery를 위해 Docker socket을 read-only bind mount로 직접 사용
+- Docker socket 직접 mount는 보안 보강 후보로 유지
+- Traefik dashboard public 노출 금지
 
-완료 기준:
+현재 작업 PC의 기본 Beta UI/Web 품질 변경은 commit `6455d7b`에 반영됐다. 이후 등록 성공 후 UI 후속 수정은 `src/client/app.ts`, `public/scripts/app.js`, `tests/e2e/run-button-browser-e2e.mjs` 3개 파일에 미커밋 상태로 남아 있다. 최신 변경을 포함한 Production 재배포와 실제 브라우저 검증은 아직 수행하지 않았다.
 
-- 선택한 배포 경로와 서버·네트워크 전제 확인 결과를 기록
-- OCI 경로라면 무료 Compute 대상임을 실제로 확인하고 유료 리소스를 만들지 않음
-- 미니PC 경로라면 DuckDNS A 레코드·updater, 공유기·호스트 TCP 443 인바운드, Traefik DNS-01 인증서와 앱·DB 포트 비공개 상태를 기록
-- 외부망의 일반 브라우저에서 신뢰되는 인증서로 HTTPS 서비스 접근 가능
+기본 Beta 변경과 미커밋 UI 후속 수정의 구현 범위:
+
+- 모바일 제목 줄바꿈 / overflow 보정
+- 입력 오류 안내
+- HTTP 429 안내
+- page title / Open Graph metadata
+- `public/og-image.png`
+- `public/robots.txt`
+- `public/sitemap.xml`
+- `/api` JSON 404
+- Traefik `POST /api/attempts` 전용 rate limit
+- 등록 성공 응답을 받은 현재 페이지의 버튼 즉시 숨김·비활성화
+- 정상 등록 응답을 받은 현재 페이지에 10초 마감 countdown 미표시
+- 결과 카드 유지
+- 현재 페이지에서 다음 Round 감지 시 참여 완료 상태 초기화
+
+작업 PC 검증:
+
+- `npm run build` 통과
+- Production Compose 설정 검사 통과
+- 로컬 정적 파일 / 404 HTTP 확인 통과
+- E2E script syntax 검사 통과
+- 색상 대비 계산값 4.79:1 이상
+- 프런트엔드 secret 문자열 미검출
+
+현재 GitHub Actions는 사용하지 않는다. CI/CD 자동 배포는 아직 도입하지 않았으며 작업 PC 검증 후 미니PC에서 수동 배포한다.
+
+남은 범위:
+
+- 미커밋 UI 후속 수정 3개 파일의 검증 후 commit / push
+- 미니PC 최신 코드 pull 및 Production image rebuild
+- Beta 변경 Production 배포
+- 실제 브라우저에서 Winner / Ranked 성공 후 버튼 즉시 숨김 확인
+- 정상 등록 응답을 받은 현재 페이지에 10초 countdown 미표시 확인
+- 다른 브라우저에서 서버의 10초 Registration Window 유지 확인
+- 현재 페이지에서 다음 Round 감지 시 참여 완료 상태 초기화 확인
+- Production rate limit 실제 동작 확인
+- Production 페이지 로드 속도 확인
+- 실제 외부 환경 Registration Race E2E
+- Winner / Position / 10초 Registration Window invariant 재검증
+- 외부 RTT
+- GET `/api/round` latency / sample 수 / p50 / p95 / p99
+- POST `/api/attempts` latency / sample 수 / p50 / p95 / p99
+- PostgreSQL container 재생성 시 volume persistence 검증
+- Docker socket 직접 mount 보강 여부 결정
+- Phase 4 artifact 및 실제 결과 문서 작성
+
+Phase 4 완료 기준:
+
+- 외부망 일반 브라우저에서 신뢰되는 HTTPS 접근
+- TCP 443 외 불필요한 inbound 비공개
 - PostgreSQL 5432 외부 접근 불가
-- application 내부 포트 불필요한 외부 공개 없음
-- production 환경 변수가 선택한 배포 경로의 별도 운영 설정으로 주입됨
-- production에서 저장소 `.env` fallback에 의존하지 않음
-- OCI 경로: 호스트 reboot 후 수동 조작 없이 PostgreSQL과 HourBoard 자동 복구
-- 미니PC 경로: 운영 구성 후 미로그인 reboot 실험을 수행하고, 자동 복구 성공 또는 실패·수동 복구 경로·운영 제약을 기록
-- reboot 후 HTTPS 접근 상태와 필요한 복구 후의 재접속 결과 확인
+- Fastify 3000 외부 접근 불가
+- Production 비밀값 저장소 미포함
+- Windows reboot 실험과 실제 복구 결과 기록
 - reboot 전후 DB 데이터 유지
-- 배포 환경에서 Winner / Position / 10초 Registration Window 핵심 invariant 통과
-- 실제 브라우저에서 핵심 사용자 흐름 확인
+- Production에서 Winner / Position / 10초 Registration Window invariant 통과
+- 등록 성공 응답을 받은 현재 페이지 세션의 참여 완료 UI 동작 통과
+- 다른 브라우저의 10초 Window 참여 가능 확인
+- 실제 브라우저 핵심 흐름 확인
 - 외부 RTT 기록
-- GET `/api/round` 및 POST `/api/attempts` latency 측정
-- 등록 p50 / p95 / p99 및 sample 수 기록
-- 로컬 Phase 3 결과와 실제 배포 환경 결과를 같은 환경의 수치처럼 혼합하지 않음
+- GET / POST latency와 p50 / p95 / p99 / sample 수 기록
+- Phase 3 로컬 baseline과 Phase 4 Production 결과 분리
 - Phase 4 artifact 생성
 - 실제 배포 환경 결과 문서 작성
 
