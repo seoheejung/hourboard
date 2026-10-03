@@ -49,7 +49,7 @@ Phase 3의 로컬 baseline은 수정하지 않았다. 아래 수치는 Phase 4 �
 | 외부 LTE/5G 핫스팟, POST `/api/attempts` | 31 | 1026.03 ms | 1042.36 ms | 1064.75 ms |
 | 외부 LTE/5G 핫스팟, TCP 443 연결 시간 | 20/20 성공 | 87.80 ms | 248.82 ms | 252.57 ms |
 
-외부 RTT는 ICMP ping이 아니라 공개 HTTPS endpoint의 **TCP connect 시간**으로 측정했다. 이 값은 TCP 연결 설정의 왕복 지연을 포함하며 HTTP 처리 시간을 포함하지 않는다. 작업 PC에 이전 미니PC LAN 대역 주소가 없는 것도 확인했다. 외부망 여부는 사용자의 핫스팟 연결 확인에 근거하며, 제3자 IP 조회 서비스는 사용하지 않았다. 수치 원본은 [동일 LAN 정각 경합](../../tests/e2e/artifacts/phase4-production-race-window-latency.json), [외부망 경합](../../tests/e2e/artifacts/phase4-production-external-race-window-latency.json), [외부 TCP 연결](../../tests/e2e/artifacts/phase4-production-external-rtt.json)에 있다.
+외부 연결 지연 시간은 공개 HTTPS endpoint의 **TCP connect 시간**으로 측정했다. TCP 연결 수립 시간은 네트워크 왕복 지연의 영향을 받지만 ICMP ping RTT와 동일한 측정치는 아니다. HTTP 처리 시간은 포함하지 않는다. 작업 PC에 이전 미니PC LAN 대역 주소가 없는 것도 확인했다. 외부망 여부는 사용자의 핫스팟 연결 확인에 근거하며, 제3자 IP 조회 서비스는 사용하지 않았다. 수치 원본은 [동일 LAN 정각 경합](../../tests/e2e/artifacts/phase4-production-race-window-latency.json), [외부망 경합](../../tests/e2e/artifacts/phase4-production-external-race-window-latency.json), [외부 TCP 연결](../../tests/e2e/artifacts/phase4-production-external-rtt.json)에 있다.
 
 동일 LAN의 실제 Chrome 페이지 로드 10회는 document load p50/p95/p99가 **33.9/385.7/385.7 ms**, `/api/round` 반영까지 **130.2/493.9/493.9 ms**였다. 이는 외부망 페이지 로드 수치가 아니다. [페이지 로드 아티팩트](../../tests/e2e/artifacts/phase4-production-page-load.json)에 개별 sample을 남겼다.
 
@@ -61,4 +61,4 @@ Phase 3의 로컬 baseline은 수정하지 않았다. 아래 수치는 Phase 4 �
 - 브라우저 새로고침 후 참여 완료 UI 상태는 복원되지 않는다. 현재 등록 API에는 로그인·세션 식별자가 없어 페이지 단위 상태로 동작한다.
 - 가정용 회선 포화형 대규모 DDoS는 앱 rate limit으로 막을 수 없다. 공개 규모가 커지면 상위 네트워크/CDN 보호가 필요하다.
 
-운영 credential, 공인·LAN IP, 개인 경로는 문서와 아티팩트에 기록하지 않았다. 최신 변경의 운영 배포, E2E, 복구, 보안 포트, 외부 RTT 및 GET/POST latency를 확인했으므로 Phase 4 완료 기준을 충족한다.
+운영 credential, 공인·LAN IP, 개인 경로는 문서와 아티팩트에 기록하지 않았다. 최신 변경의 운영 배포, E2E, 복구, 보안 포트, 외부 TCP 443 연결 시간 및 GET/POST latency를 확인했으므로 Phase 4 완료 기준을 충족한다.

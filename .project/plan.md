@@ -350,7 +350,7 @@ SELECT 존재 확인
 - 불필요한 ORM 추상화 도입 금지
 - 성능 측정 전 임의의 cache/Redis 추가 금지
 
-절대 latency 목표는 기획 단계에서 임의로 확정하지 않는다. Phase 3에서는 로컬 환경 baseline을 만들고, Phase 4에서는 실제 외부 배포 환경의 baseline과 RTT를 별도로 측정한다. 두 환경의 결과를 구분한 뒤 성능 budget 필요 여부를 판단한다.
+절대 latency 목표는 기획 단계에서 임의로 확정하지 않는다. Phase 3에서는 로컬 환경 baseline을 만들고, Phase 4에서는 실제 외부 배포 환경의 baseline과 TCP 443 연결 시간을 별도로 측정한다. 두 환경의 결과를 구분한 뒤 성능 budget 필요 여부를 판단한다.
 
 측정 항목:
 
@@ -667,7 +667,7 @@ Phase 4 완료 기준:
 - 등록 성공 후 입력 문구 비움과 다음 Round 초안 재입력 동작 통과
 - 다른 브라우저의 10초 Window 참여 가능 확인
 - 실제 브라우저 핵심 흐름 확인
-- 외부 RTT 기록
+- 외부 TCP 443 연결 시간 기록
 - GET / POST latency와 p50 / p95 / p99 / sample 수 기록
 - Phase 3 로컬 baseline과 Phase 4 Production 결과 분리
 - Phase 4 artifact 생성

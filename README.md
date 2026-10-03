@@ -248,7 +248,7 @@ hourboard.duckdns.org
 → Fastify
 → PostgreSQL
 ```
-미니PC에서 운영 Compose를 기동했고, 외부 LTE/5G에서 HTTPS 화면과 API 접속을 확인했다. Windows 재부팅 후에도 컨테이너와 외부 HTTPS가 복구되고 이전 Winner·attemptCount가 유지됐다. 외부 동시 등록 E2E와 latency 측정은 진행 전이다.
+미니PC에서 운영 Compose를 기동했고, 외부 LTE/5G에서 HTTPS 화면과 API 접속을 확인했다. Windows 재부팅 후에도 컨테이너와 외부 HTTPS가 복구되고 이전 Winner·attemptCount가 유지됐다. 외부 LTE/5G 핫스팟에서 Registration Race와 GET/POST latency, TCP 443 연결 시간을 측정했다.
 
 운영 화면:
 
