@@ -1,0 +1,58 @@
+{
+  "scenario": "production-hour-boundary-race-window-latency",
+  "startedAt": "2026-10-03T11:56:58.212Z",
+  "targetSlotAt": "2026-10-03T12:00:00.000Z",
+  "measurementVantage": "work PC LAN via public HTTPS origin",
+  "race": {
+    "requested": 100,
+    "succeeded": 100,
+    "failed": 0,
+    "followupRequested": 1,
+    "totalRequested": 101,
+    "totalSucceeded": 101,
+    "winnerCount": 1,
+    "minPosition": 1,
+    "maxPosition": 101,
+    "duplicatePositions": 0,
+    "missingPositions": 0,
+    "winnerMessageMutations": 0,
+    "statusCounts": {
+      "200": 100
+    }
+  },
+  "checks": {
+    "target is the next Production hour": true,
+    "future slot is rejected before the hour": true,
+    "ended slot is rejected": true,
+    "current slot opens at the hour boundary": true,
+    "followup within ten seconds is ranked": true,
+    "Production winner and rank invariants": true,
+    "late registration is closed without consuming a position": true
+  },
+  "raceStartedAt": "2026-10-03T12:00:00.279Z",
+  "windowFollowup": {
+    "status": 200,
+    "code": "RANKED",
+    "position": 101
+  },
+  "postLatency": {
+    "sampleCount": 101,
+    "p50Ms": 450.09,
+    "p95Ms": 588.71,
+    "p99Ms": 599.75
+  },
+  "late": {
+    "status": 409,
+    "code": "REGISTRATION_CLOSED",
+    "position": null,
+    "countBefore": 101,
+    "countAfter": 101
+  },
+  "getRoundLatency": {
+    "sampleCount": 40,
+    "p50Ms": 13.33,
+    "p95Ms": 22.87,
+    "p99Ms": 40.7
+  },
+  "finishedAt": "2026-10-03T12:00:11.143Z"
+}

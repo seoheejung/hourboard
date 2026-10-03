@@ -1,0 +1,43 @@
+{
+  "scenario": "production-http-security-smoke",
+  "startedAt": "2026-10-03T12:19:52.657Z",
+  "measurementVantage": "work PC LAN via public HTTPS origin",
+  "responses": {
+    "/": {
+      "status": 200,
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      "nosniff": "nosniff",
+      "referrerPolicy": "no-referrer"
+    },
+    "/health": {
+      "status": 200,
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      "nosniff": "nosniff",
+      "referrerPolicy": "no-referrer"
+    },
+    "/api/round": {
+      "status": 200,
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      "nosniff": "nosniff",
+      "referrerPolicy": "no-referrer"
+    },
+    "unknownApi": {
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "code": "NOT_FOUND",
+      "hasStack": false
+    },
+    "largeBody": {
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "code": "INVALID_REQUEST",
+      "hasStack": false
+    }
+  },
+  "checks": {
+    "root, health, and round are available with security headers": true,
+    "unknown API returns JSON 404 without stack": true,
+    "oversized body returns JSON 400 without stack": true
+  },
+  "finishedAt": "2026-10-03T12:19:53.043Z"
+}

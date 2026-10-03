@@ -266,7 +266,7 @@ OCI Japan East (Tokyo) A1 Flex를 무료 배포 후보로 검증했으나 Comput
 
 ## Beta UI · Web 품질 보강
 
-작업 PC 기준으로 아래 기본 Beta UI/Web 품질 변경은 commit `6455d7b`에 반영했다. 이후 등록 완료 UI와 보안 헤더를 로컬에서 구현·검증했다. 최신 변경의 Production 재배포와 운영 브라우저 검증은 아직 수행하지 않았다. [로컬 검증 결과](docs/results/phase4-local-ui-security-followup.md)에 확인 범위를 기록했다.
+기본 Beta UI/Web 품질 변경은 commit `6455d7b`에, 등록 완료 UI와 보안 헤더는 commit `7ba177e`에 반영했다. 최신 변경은 Production에 배포했고 실제 HTTPS 응답과 브라우저에서 확인했다. [로컬 검증 결과](docs/results/phase4-local-ui-security-followup.md)에 초기 확인 범위를 기록했다.
 
 - 모바일 제목 줄바꿈과 overflow 보정
 - 입력 오류 안내 개선
@@ -284,13 +284,15 @@ OCI Japan East (Tokyo) A1 Flex를 무료 배포 후보로 검증했으나 Comput
 
 로컬에서 `npm run build`, 실제 PostgreSQL Phase 1·2 E2E, 실제 Chrome 두 브라우저 컨텍스트 등록 E2E, 보안 헤더·본문 제한·JSON 404 HTTP 확인을 통과했다. Production Compose 설정 검사는 앞선 Beta 작업에서 통과했다.
 
-아직 확인하지 않은 항목:
+Production 확인 결과:
 
-- Production에서 등록 성공 후 버튼 즉시 숨김·다음 Round 초기화
-- Production에서 등록 후 입력 문구 비움과 보안 헤더
-- Production rate limit 실제 동작
-- Production 페이지 로드 속도
-- 외부 E2E와 latency
+- 작업 PC의 동일 LAN에서 공개 HTTPS 주소를 통한 실제 Chrome 세 브라우저 컨텍스트로 Winner / Ranked / 미등록 브라우저의 10초 내 참여, 입력창 초기화, 결과 카드 유지, 등록 버튼 숨김, 다음 Round 초기화 확인
+- HTTPS 루트·`/health`·`/api/round` 응답에서 CSP·`nosniff`·`no-referrer` 확인
+- 미정의 `/api` 경로는 JSON 404, 4 KiB 초과 등록 본문은 stack trace 없는 JSON 400 확인
+- 등록 API 전용 rate limit의 HTTP 429와 GET 경로의 정상 응답 확인
+- 정각 경계의 병렬 등록 100건과 후속 등록 1건에서 Winner 1명, 중복·누락 순위 0건 확인
+- PostgreSQL 컨테이너 재생성 후 Winner와 attemptCount 유지 확인
+- 페이지 로드는 작업 PC의 동일 LAN에서 공개 HTTPS 주소로 측정했다. GET/POST 지연 시간은 동일 LAN과 외부 LTE/5G 핫스팟에서 각각 측정했고, 외부 TCP 443 연결 시간도 기록했다
 
 HTTPS는 현재 TCP 443 전용으로 운영하며 HTTP 80 → HTTPS redirect는 구성하지 않는다.
 
@@ -478,7 +480,7 @@ Registration Window 종료 후 `REGISTRATION_CLOSED`로 거부된 요청은 Posi
 
 ### Phase 4 — Production Deployment
 
-**상태: 진행 중**
+**상태: 완료**
 
 Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, 복구, 보안 포트, 외부 E2E와 latency를 검증한다.
 
@@ -493,7 +495,7 @@ Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, �
 
 #### Phase 4B — 자체 호스팅 미니PC
 
-현재 운영 중인 기본 배포 경로다. [운영 사이트](https://hourboard.duckdns.org/)와 [Phase 4B 진행 기록](docs/progress/phase4-self-hosted-deployment.md)에서 실제 확인 범위를 볼 수 있다.
+현재 운영 중인 기본 배포 경로다. [운영 사이트](https://hourboard.duckdns.org/)와 [Phase 4 Production 결과](docs/results/phase4-production-deployment.md)에서 실제 확인 범위를 볼 수 있다. 초기 배포와 재부팅 이력은 [Phase 4B 진행 기록](docs/progress/phase4-self-hosted-deployment.md)에 남겼다.
 
 물리 환경:
 
@@ -529,7 +531,7 @@ Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, �
 - Fastify container가 `node` 사용자로 실행됨을 확인
 - 정상 상태 incident baseline 로그 수집
 
-현재 작업 PC에 구현됐지만 아직 Production 미배포:
+Production에 배포된 변경:
 
 - 모바일 제목/overflow 보정
 - 입력 오류·429 안내
@@ -539,16 +541,7 @@ Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, �
 - 등록 성공 응답을 받은 현재 페이지의 버튼 즉시 숨김·10초 안내 미표시·입력 문구 비움·다음 Round 감지 시 초기화
 - CSP·`nosniff`·`no-referrer` 응답 헤더
 
-남은 검증:
-
-- 최신 변경의 Production 재배포
-- 실제 브라우저에서 Winner / Ranked 성공 후 버튼 상태와 다음 Round 초기화
-- 다른 브라우저의 10초 Registration Window 유지 확인
-- Production rate limit 실제 동작
-- Production 페이지 로드 속도
-- 외부 E2E
-- 외부 RTT 및 p50 / p95 / p99
-- Docker socket 직접 mount 보안 보강 여부 결정
+외부 LTE/5G 핫스팟에서 병렬 등록 30건과 후속 등록 1건의 Winner·순위·10초 Window 불변식을 확인했다. 외부 TCP 443 연결 시간 20회, GET 40회, POST 31회의 p50 / p95 / p99와 동일 LAN 측정값을 분리해 [Phase 4 Production 결과](docs/results/phase4-production-deployment.md)에 기록했다. Docker socket 직접 mount는 현행 구성을 유지하고 보강을 별도 인프라 변경으로 검토한다.
 
 작업 PC 검증 결과: [로컬 등록 완료 UI·보안 점검](docs/results/phase4-local-ui-security-followup.md)
 
@@ -612,4 +605,5 @@ hourboard/
 | `docs/results/*` | 완료된 구현·검증 결과 |
 | `docs/instructions/phase4-self-hosted-deployment.md` | Phase 4B 미니PC 배포·검증 지침 |
 | `docs/progress/phase4-oci-deployment.md` | OCI Phase 4A 시도와 capacity 결과 |
-| `docs/progress/phase4-self-hosted-deployment.md` | Phase 4B 실제 배포와 남은 검증 |
+| `docs/progress/phase4-self-hosted-deployment.md` | Phase 4B 초기 배포와 재부팅 진행 기록 |
+| `docs/results/phase4-production-deployment.md` | Phase 4 운영 배포·외부 E2E·지연 시간 결과 |

@@ -385,7 +385,7 @@ SELECT 존재 확인
 - HTML·정적 자산·API 응답에 CSP, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` 적용
 - 프런트엔드 정적 파일에서 운영 secret 관련 문자열이 없어야 함
 - Production Traefik에서 `POST /api/attempts`에만 rate limit middleware 적용
-- Rate limit의 Production 실제 동작은 배포 후 별도 검증
+- Rate limit의 Production 실제 동작은 HTTP 429 및 GET 경로 200으로 확인
 - Traefik dashboard public 노출 금지
 - 현재 Traefik은 Docker service discovery를 위해 `/var/run/docker.sock`을 read-only bind mount로 직접 사용함
 - Docker socket의 `:ro`는 Docker API 자체를 read-only로 제한하는 보안 경계로 취급하지 않음
@@ -415,12 +415,14 @@ SELECT 존재 확인
 - 로컬 정적 파일·404 HTTP 확인
 - 프런트엔드 secret 관련 문자열 미검출
 
-Production 미검증:
+Production 확인 완료:
 
-- 실제 브라우저 E2E
-- Production rate limit
-- Production 페이지 로드 속도
+- 동일 LAN에서 공개 HTTPS 주소를 통한 실제 Chrome 브라우저 E2E
+- 등록 API rate limit의 HTTP 429 및 GET 경로 200
+- 동일 LAN에서 공개 HTTPS 주소를 통한 페이지 로드 속도 측정
 - Beta UI/Web 품질 변경의 실제 배포
+
+외부망 Registration Race E2E와 지연 시간 측정까지 완료했다. 수치와 실행 환경은 `docs/results/phase4-production-deployment.md`에 기록한다.
 
 ---
 
@@ -493,9 +495,9 @@ hourboard/
 
 ## 현재 구현 기준
 
-Phase 1과 Phase 2 MVP 구현 및 이후 확인된 수정 사항을 기준으로 한다. 최근 Beta UI/Web 품질 변경과 등록 성공 후 버튼 처리 변경은 작업 PC에 구현됐지만 아직 Production 배포 전이므로 운영 완료 사실과 구분한다.
+Phase 1과 Phase 2 MVP 구현 및 이후 확인된 수정 사항을 기준으로 한다. 최근 Beta UI/Web 품질 변경과 등록 성공 후 버튼 처리 변경은 Production에 배포하고 검증했다.
 
-이 문서에서 앞으로 검증·배포 대상으로 관리하는 범위는 **Phase 4**다.
+이 문서에서 완료된 최종 검증 범위는 **Phase 4**다.
 
 Phase 1·2·3의 실제 구현 사실과 검증 이력은 `docs/results/*`를 우선하며, Phase 4에서 기존 동작을 임의로 되돌리거나 재설계하지 않는다.
 
@@ -535,7 +537,7 @@ Phase 3 작업에서 Phase 1 동시성 semantics를 임의로 변경하지 않�
 - 모바일 및 접근성 처리
 - 실제 로컬 실행 경로 검증
 
-최근 로컬 UI 후속 변경은 build와 실제 PostgreSQL·Chrome 브라우저 E2E를 통과했다. 다음 Round 전환은 브라우저 시각 조정으로 검증했으며 실제 운영 브라우저 검증은 Phase 4에 남아 있다.
+최근 UI 후속 변경은 build, 실제 PostgreSQL·Chrome 브라우저 E2E, Production Chrome 브라우저 E2E를 통과했다. 열린 페이지의 다음 Round 전환도 실제 운영 시각 경과로 확인했다.
 
 기존 구현과 검증 결과는 `docs/results/phase2-ticketing-ui.md` 및 이후 MVP 수정 이력을 기준으로 한다.
 
@@ -554,7 +556,7 @@ Phase 3 작업에서 Phase 1 동시성 semantics를 임의로 변경하지 않�
 
 ### Phase 4 — Production Deployment
 
-**상태: 진행 중**
+**상태: 완료**
 
 Phase 3 로컬 baseline을 수정하지 않고 비교 기준으로 사용한다. 실제 외부 환경에서 배포·복구·보안·latency를 검증한다.
 
@@ -603,7 +605,7 @@ Internet
 - Docker socket 직접 mount는 보안 보강 후보로 유지
 - Traefik dashboard public 노출 금지
 
-현재 작업 PC의 기본 Beta UI/Web 품질 변경은 commit `6455d7b`에 반영됐다. 이후 등록 완료 UI와 보안 헤더를 작업 PC에서 구현하고 실제 Chrome·Fastify·PostgreSQL E2E로 검증했다. 최신 변경의 Production 재배포와 운영 브라우저 검증은 아직 수행하지 않았다. 로컬 결과는 `docs/results/phase4-local-ui-security-followup.md`에 기록한다.
+기본 Beta UI/Web 품질 변경은 commit `6455d7b`에, 등록 완료 UI와 보안 헤더는 commit `7ba177e`에 반영됐다. 최신 변경은 Production에 배포했고 실제 HTTPS 응답과 Chrome 브라우저에서 검증했다. 로컬 검증 결과는 `docs/results/phase4-local-ui-security-followup.md`에 기록한다.
 
 기본 Beta 변경과 로컬 후속 수정의 구현 범위:
 
@@ -637,25 +639,19 @@ Internet
 
 현재 GitHub Actions는 사용하지 않는다. CI/CD 자동 배포는 아직 도입하지 않았으며 작업 PC 검증 후 미니PC에서 수동 배포한다.
 
-남은 범위:
+Production에서 확인한 범위:
 
-- 미니PC 최신 코드 pull 및 Production image rebuild
-- Beta 변경 Production 배포
-- 실제 브라우저에서 Winner / Ranked 성공 후 버튼 즉시 숨김 확인
-- 정상 등록 응답을 받은 현재 페이지에 10초 countdown 미표시 확인
-- 다른 브라우저에서 서버의 10초 Registration Window 유지 확인
-- 현재 페이지에서 다음 Round 감지 시 참여 완료 상태 초기화 확인
-- Production에서 등록 완료 입력 문구 비움과 보안 헤더 확인
-- Production rate limit 실제 동작 확인
-- Production 페이지 로드 속도 확인
-- 실제 외부 환경 Registration Race E2E
-- Winner / Position / 10초 Registration Window invariant 재검증
-- 외부 RTT
-- GET `/api/round` latency / sample 수 / p50 / p95 / p99
-- POST `/api/attempts` latency / sample 수 / p50 / p95 / p99
-- PostgreSQL container 재생성 시 volume persistence 검증
-- Docker socket 직접 mount 보강 여부 결정
-- Phase 4 artifact 및 실제 결과 문서 작성
+- 최신 코드와 Beta 변경 배포, HTTPS 보안 헤더 적용
+- 미정의 `/api` 경로의 JSON 404와 4 KiB 초과 등록 본문의 JSON 400 확인
+- 동일 LAN에서 공개 HTTPS 주소를 통한 실제 Chrome 세 브라우저 컨텍스트에서 Winner / Ranked / 미등록 브라우저의 10초 내 참여, 입력창 초기화, 결과 카드 유지, 등록 버튼 숨김, 다음 Round 초기화
+- 등록 API 전용 rate limit의 429와 GET 경로 200
+- 정각 경계의 병렬 등록 100건과 후속 등록 1건에서 Winner / Position / 10초 Window invariant
+- 작업 PC의 동일 LAN에서 공개 HTTPS 주소를 통한 페이지 로드와 GET/POST 지연 시간 측정
+- PostgreSQL container 재생성 후 기존 Winner·attemptCount 유지
+- 외부 LTE/5G 핫스팟에서 병렬 등록 30건과 후속 1건의 Winner / Position / 10초 Window invariant
+- 외부 TCP 443 연결 시간 20회 및 GET 40회·POST 31회 p50 / p95 / p99 측정
+
+Docker socket 직접 mount는 현행 구성을 유지하고 보강을 별도 인프라 변경으로 검토한다. Phase 4 실행 환경, 수치, 아티팩트, 제약은 `docs/results/phase4-production-deployment.md`에 기록한다.
 
 Phase 4 완료 기준:
 

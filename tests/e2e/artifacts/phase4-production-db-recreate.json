@@ -1,0 +1,21 @@
+{
+  "scenario": "production-db-container-recreation",
+  "volume": "hourboard-prod_postgres_data",
+  "before": {
+    "sampledAt": "2026-10-03T12:02:05.816Z",
+    "slotAt": "2026-10-03T12:00:00.000Z",
+    "attemptCount": 101,
+    "winnerMessageSha256": "aa36d8121e44220ee3b1f6194d06bd92f0f6ee9507eae033682c3c0963902750",
+    "healthStatus": 200,
+    "roundStatus": 200
+  },
+  "after": {
+    "sampledAt": "2026-10-03T12:02:31.536Z",
+    "slotAt": "2026-10-03T12:00:00.000Z",
+    "attemptCount": 101,
+    "winnerMessageSha256": "aa36d8121e44220ee3b1f6194d06bd92f0f6ee9507eae033682c3c0963902750",
+    "healthStatus": 200,
+    "roundStatus": 200
+  },
+  "preserved": true
+}

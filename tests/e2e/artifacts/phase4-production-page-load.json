@@ -1,0 +1,59 @@
+{
+  "scenario": "production-browser-page-load",
+  "measurementVantage": "work PC LAN via public HTTPS origin",
+  "sampledAt": "2026-10-03T12:06:49.414Z",
+  "samples": [
+    {
+      "documentLoadMs": 385.70000000018626,
+      "roundReadyMs": 493.8999999994412
+    },
+    {
+      "documentLoadMs": 32,
+      "roundReadyMs": 135.3999999994412
+    },
+    {
+      "documentLoadMs": 61.700000000186265,
+      "roundReadyMs": 161.40000000037253
+    },
+    {
+      "documentLoadMs": 33.200000000186265,
+      "roundReadyMs": 129.40000000037253
+    },
+    {
+      "documentLoadMs": 34.40000000037253,
+      "roundReadyMs": 130.20000000018626
+    },
+    {
+      "documentLoadMs": 33.40000000037253,
+      "roundReadyMs": 126
+    },
+    {
+      "documentLoadMs": 30.399999999441206,
+      "roundReadyMs": 127.19999999925494
+    },
+    {
+      "documentLoadMs": 33.89999999944121,
+      "roundReadyMs": 134.29999999981374
+    },
+    {
+      "documentLoadMs": 36.799999999813735,
+      "roundReadyMs": 127.3999999994412
+    },
+    {
+      "documentLoadMs": 35.799999999813735,
+      "roundReadyMs": 133.8999999994412
+    }
+  ],
+  "documentLoad": {
+    "sampleCount": 10,
+    "p50Ms": 33.9,
+    "p95Ms": 385.7,
+    "p99Ms": 385.7
+  },
+  "roundReady": {
+    "sampleCount": 10,
+    "p50Ms": 130.2,
+    "p95Ms": 493.9,
+    "p99Ms": 493.9
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "scenario": "production-post-attempts-rate-limit",
+  "startedAt": "2026-10-03T11:54:52.060Z",
+  "measurementVantage": "work PC LAN via public HTTPS origin",
+  "configuredFromRunningContainer": {
+    "average": 30,
+    "period": "1s",
+    "burst": 150
+  },
+  "requested": 300,
+  "postStatusCounts": {
+    "400": 200,
+    "429": 100
+  },
+  "healthStatuses": [
+    200,
+    200,
+    200
+  ],
+  "roundStatuses": [
+    200,
+    200,
+    200
+  ],
+  "checks": {
+    "POST rate limit returned 429": true,
+    "unlimited POST remained invalid rather than registering": true,
+    "health GET remained 200": true,
+    "round GET remained 200": true
+  },
+  "rateLimited": 100,
+  "rejectedInvalid": 200,
+  "networkFailed": 0,
+  "finishedAt": "2026-10-03T11:54:55.289Z"
+}
