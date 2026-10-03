@@ -735,3 +735,24 @@ oci
 - Fastify Documentation: https://fastify.dev/docs/latest/
 - PostgreSQL Versioning Policy: https://www.postgresql.org/support/versioning/
 - OCI Free Tier: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm
+
+---
+
+## 18. 현재 미확정 사항
+
+Phase 4 완료와 별개로 장기 운영이나 서비스 확장 시 결정해야 할 항목이다.
+
+- PostgreSQL connection pool 최종 크기
+- Fastify worker/process 개수
+- Production container resource 제한
+- 현재 검증 범위를 넘어서는 실제 최대 동시 요청 규모
+- UptimeRobot `/health` monitor 실제 설정 여부
+- Docker socket direct mount 보강 방식
+- Let's Encrypt의 실제 자동 갱신 시점 검증
+- 실제 공인 IPv4 변경 상황에서 DuckDNS 자동 갱신 검증
+- 별도 요구가 있을 경우 GUI 로그인 없는 완전 unattended boot recovery
+- 공개 운영 시 moderation 방식
+- 공개 운영 시 추가 abuse 방지 정책
+- 대규모 DDoS 대응을 위한 CDN/WAF 또는 상위 네트워크 방어 구조
+
+이 항목들은 Phase 4 완료 조건에 포함하지 않으며 실제 필요가 생길 때 별도 변경 범위로 관리한다.
