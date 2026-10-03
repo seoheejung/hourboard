@@ -373,6 +373,7 @@ SELECT 존재 확인
 - HTML 저장·렌더링 금지
 - 브라우저 출력은 `textContent` 또는 동등한 escaping 방식 사용
 - request body 최대 크기 제한
+- Fastify request body 한도는 4 KiB로 유지
 - 문구 길이 제한 적용
 - 빈 문자열 및 공백-only 문자열 거부
 - DB credential과 DuckDNS token은 운영 환경 변수로 관리
@@ -381,6 +382,7 @@ SELECT 존재 확인
 - Fastify host port 공개 금지
 - Production ingress는 Traefik TCP 443만 공개
 - Production stack trace 클라이언트 노출 금지
+- HTML·정적 자산·API 응답에 CSP, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` 적용
 - 프런트엔드 정적 파일에서 운영 secret 관련 문자열이 없어야 함
 - Production Traefik에서 `POST /api/attempts`에만 rate limit middleware 적용
 - Rate limit의 Production 실제 동작은 배포 후 별도 검증
@@ -524,6 +526,7 @@ Phase 3 작업에서 Phase 1 동시성 semantics를 임의로 변경하지 않�
 - Winner / Ranked 결과 UI
 - `WINNER` 또는 `RANKED` 성공 응답을 받은 현재 페이지 세션에서 등록 버튼 즉시 숨김·비활성화
 - 정상 등록 응답을 받은 현재 페이지에 Registration Window countdown 미표시
+- 정상 등록 응답 뒤 제출한 입력 문구 비움·새 초안 입력 허용
 - 등록 성공 결과 카드 유지
 - 다른 브라우저의 10초 Registration Window는 서버 규칙대로 유지
 - 새로고침 시 참여 완료 상태 미복원·서버 사용자 식별 없음
@@ -532,7 +535,7 @@ Phase 3 작업에서 Phase 1 동시성 semantics를 임의로 변경하지 않�
 - 모바일 및 접근성 처리
 - 실제 로컬 실행 경로 검증
 
-최근 UI 변경은 build와 E2E script syntax 검사를 통과했다. 현재 작업 환경에는 PostgreSQL과 Chrome CDP가 없어 수정된 성공 후 버튼 흐름의 실제 브라우저 E2E는 아직 실행하지 못했다.
+최근 로컬 UI 후속 변경은 build와 실제 PostgreSQL·Chrome 브라우저 E2E를 통과했다. 다음 Round 전환은 브라우저 시각 조정으로 검증했으며 실제 운영 브라우저 검증은 Phase 4에 남아 있다.
 
 기존 구현과 검증 결과는 `docs/results/phase2-ticketing-ui.md` 및 이후 MVP 수정 이력을 기준으로 한다.
 
@@ -600,9 +603,9 @@ Internet
 - Docker socket 직접 mount는 보안 보강 후보로 유지
 - Traefik dashboard public 노출 금지
 
-현재 작업 PC의 기본 Beta UI/Web 품질 변경은 commit `6455d7b`에 반영됐다. 이후 등록 성공 후 UI 후속 수정은 `src/client/app.ts`, `public/scripts/app.js`, `tests/e2e/run-button-browser-e2e.mjs` 3개 파일에 미커밋 상태로 남아 있다. 최신 변경을 포함한 Production 재배포와 실제 브라우저 검증은 아직 수행하지 않았다.
+현재 작업 PC의 기본 Beta UI/Web 품질 변경은 commit `6455d7b`에 반영됐다. 이후 등록 완료 UI와 보안 헤더를 작업 PC에서 구현하고 실제 Chrome·Fastify·PostgreSQL E2E로 검증했다. 최신 변경의 Production 재배포와 운영 브라우저 검증은 아직 수행하지 않았다. 로컬 결과는 `docs/results/phase4-local-ui-security-followup.md`에 기록한다.
 
-기본 Beta 변경과 미커밋 UI 후속 수정의 구현 범위:
+기본 Beta 변경과 로컬 후속 수정의 구현 범위:
 
 - 모바일 제목 줄바꿈 / overflow 보정
 - 입력 오류 안내
@@ -615,8 +618,10 @@ Internet
 - Traefik `POST /api/attempts` 전용 rate limit
 - 등록 성공 응답을 받은 현재 페이지의 버튼 즉시 숨김·비활성화
 - 정상 등록 응답을 받은 현재 페이지에 10초 마감 countdown 미표시
+- Winner·Ranked 성공 시 제출한 입력 문구를 비우고 다음 Round 초안을 다시 입력할 수 있도록 유지
 - 결과 카드 유지
 - 현재 페이지에서 다음 Round 감지 시 참여 완료 상태 초기화
+- CSP·`nosniff`·`no-referrer` 응답 헤더
 
 작업 PC 검증:
 
@@ -626,18 +631,21 @@ Internet
 - E2E script syntax 검사 통과
 - 색상 대비 계산값 4.79:1 이상
 - 프런트엔드 secret 문자열 미검출
+- 실제 PostgreSQL Phase 1·2 E2E 통과
+- 실제 Chrome 두 브라우저 컨텍스트·Fastify·PostgreSQL 등록 흐름 E2E 통과
+- 로컬 HTTP에서 보안 헤더·4 KiB 본문 제한·JSON 404·DB 오류 응답 확인
 
 현재 GitHub Actions는 사용하지 않는다. CI/CD 자동 배포는 아직 도입하지 않았으며 작업 PC 검증 후 미니PC에서 수동 배포한다.
 
 남은 범위:
 
-- 미커밋 UI 후속 수정 3개 파일의 검증 후 commit / push
 - 미니PC 최신 코드 pull 및 Production image rebuild
 - Beta 변경 Production 배포
 - 실제 브라우저에서 Winner / Ranked 성공 후 버튼 즉시 숨김 확인
 - 정상 등록 응답을 받은 현재 페이지에 10초 countdown 미표시 확인
 - 다른 브라우저에서 서버의 10초 Registration Window 유지 확인
 - 현재 페이지에서 다음 Round 감지 시 참여 완료 상태 초기화 확인
+- Production에서 등록 완료 입력 문구 비움과 보안 헤더 확인
 - Production rate limit 실제 동작 확인
 - Production 페이지 로드 속도 확인
 - 실제 외부 환경 Registration Race E2E
@@ -660,6 +668,7 @@ Phase 4 완료 기준:
 - reboot 전후 DB 데이터 유지
 - Production에서 Winner / Position / 10초 Registration Window invariant 통과
 - 등록 성공 응답을 받은 현재 페이지 세션의 참여 완료 UI 동작 통과
+- 등록 성공 후 입력 문구 비움과 다음 Round 초안 재입력 동작 통과
 - 다른 브라우저의 10초 Window 참여 가능 확인
 - 실제 브라우저 핵심 흐름 확인
 - 외부 RTT 기록

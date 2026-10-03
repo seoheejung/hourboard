@@ -17,6 +17,14 @@ const app = Fastify({
   ajv: { customOptions: { coerceTypes: false, removeAdditional: false } }
 });
 
+app.addHook('onRequest', async (_request, reply) => {
+  reply.headers({
+    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer'
+  });
+});
+
 app.setErrorHandler((error, request, reply) => {
   const details = error as { statusCode?: number; validation?: unknown };
   const isBadRequest = details.statusCode === 400 || details.statusCode === 413 || Boolean(details.validation);

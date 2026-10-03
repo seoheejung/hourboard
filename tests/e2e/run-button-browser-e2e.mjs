@@ -20,10 +20,13 @@ const admin = new pg.Pool({ connectionString: databaseUrl.toString() });
 let pool;
 let app;
 let socket;
+let firstSocket;
+let secondSocket;
+let browserSocket;
 const checks = {};
 const artifact = {
   scenario: 'current-round-browser-registration',
-  browser: 'Chrome headless via DevTools Protocol',
+  browser: 'Chrome headless with two browser contexts via DevTools Protocol',
   requested: 4,
   succeeded: 0,
   failed: 0,
@@ -58,6 +61,11 @@ async function until(action, limit = 60) {
 }
 
 try {
+  const msUntilNextHour = 3_600_000 - (Date.now() % 3_600_000);
+  if (msUntilNextHour < 45_000) {
+    console.log('Browser E2E: waiting for the next round');
+    await new Promise(resolve => setTimeout(resolve, msUntilNextHour + 1_000));
+  }
   console.log('Browser E2E: preparing database');
   const found = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', ['hourboard_e2e']);
   if (!found.rowCount) await admin.query('CREATE DATABASE hourboard_e2e');
@@ -92,16 +100,18 @@ try {
     socket.addEventListener('open', resolve, { once: true });
     socket.addEventListener('error', reject, { once: true });
   });
+  firstSocket = socket;
   let id = 0;
   const pending = new Map();
-  socket.addEventListener('message', event => {
+  const handlePageMessage = event => {
     const response = JSON.parse(event.data);
     const item = pending.get(response.id);
     if (!item) return;
     pending.delete(response.id);
     if (response.error) item.reject(new Error(response.error.message));
     else item.resolve(response.result);
-  });
+  };
+  socket.addEventListener('message', handlePageMessage);
   function send(method, params = {}) {
     return new Promise((resolve, reject) => {
       const next = ++id;
@@ -140,7 +150,8 @@ try {
   await until(async () => evaluate("document.getElementById('result').dataset.state === 'winner'"));
   check('first registration shows WINNER', await evaluate("document.getElementById('result').textContent.includes('축하합니다!')"));
   check('winner copy says until the next hour', await evaluate("document.getElementById('result').textContent.includes('작성하신 문구를 다음 정각까지 띄워드립니다.')"));
-  check('winner submission immediately hides button and keeps result', await evaluate("document.getElementById('submit-button').hidden && document.getElementById('submit-button').disabled && document.getElementById('result').dataset.state === 'winner' && document.getElementById('round-status').textContent === '등록이 완료되었습니다. 다음 정각에 다시 참여할 수 있습니다.'"));
+  check('browser A winner hides button and status while keeping result', await evaluate("document.getElementById('submit-button').hidden && document.getElementById('submit-button').disabled && document.getElementById('result').dataset.state === 'winner' && document.getElementById('round-status').hidden && document.getElementById('round-status').textContent === ''"));
+  check('browser A clears submitted draft while retaining winner board', await evaluate("document.getElementById('message-input').value === '' && document.getElementById('remaining').textContent === '120자 남음' && document.getElementById('board-message').textContent.includes('browser-first')"));
   const openedRound = await (await fetch(`${base}/api/round`)).json();
   const firstRow = await pool.query('SELECT created_at FROM hour_slots WHERE slot_start = $1', [slotAt]);
   const closesAt = openedRound.currentSlot.registrationClosesAt;
@@ -149,15 +160,57 @@ try {
     && Date.parse(closesAt) === Math.min(firstRow.rows[0].created_at.getTime() + 10_000, Date.parse(openedRound.currentSlot.endsAt)));
   artifact.registrationClosesAt = closesAt;
 
-  await send('Page.navigate', { url: base });
+  const browserInfo = await (await fetch(new URL('/json/version', cdpUrl))).json();
+  browserSocket = new WebSocket(browserInfo.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    browserSocket.addEventListener('open', resolve, { once: true });
+    browserSocket.addEventListener('error', reject, { once: true });
+  });
+  let browserId = 0;
+  const browserPending = new Map();
+  browserSocket.addEventListener('message', event => {
+    const response = JSON.parse(event.data);
+    const item = browserPending.get(response.id);
+    if (!item) return;
+    browserPending.delete(response.id);
+    if (response.error) item.reject(new Error(response.error.message));
+    else item.resolve(response.result);
+  });
+  function sendBrowser(method, params = {}) {
+    return new Promise((resolve, reject) => {
+      const next = ++browserId;
+      browserPending.set(next, { resolve, reject });
+      browserSocket.send(JSON.stringify({ id: next, method, params }));
+    });
+  }
+  const { browserContextId } = await sendBrowser('Target.createBrowserContext', { disposeOnDetach: true });
+  const { targetId } = await sendBrowser('Target.createTarget', { url: base, browserContextId });
+  const secondPage = await until(async () => {
+    const pages = await (await fetch(new URL('/json', cdpUrl))).json();
+    return pages.find(tab => tab.id === targetId);
+  });
+  secondSocket = new WebSocket(secondPage.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    secondSocket.addEventListener('open', resolve, { once: true });
+    secondSocket.addEventListener('error', reject, { once: true });
+  });
+  secondSocket.addEventListener('message', handlePageMessage);
+  socket = secondSocket;
+  await send('Page.enable');
+  await send('Runtime.enable');
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await until(async () => evaluate("/^등록 마감까지 [1-9][0-9]?초$/.test(document.getElementById('round-status')?.textContent ?? '')"));
-  check('another visit can register during the open window', await evaluate("!document.getElementById('submit-button').hidden"));
+  check('browser B can register during the open window', await evaluate("!document.getElementById('submit-button').hidden"));
   check('valid message enables button with winner', !(await type('browser-second')));
   await evaluate("document.getElementById('submit-button').click()");
   await until(async () => evaluate("document.getElementById('result').dataset.state === 'ranked'"));
   check('subsequent registration shows RANKED position 2 once', await evaluate("(document.getElementById('result').textContent.match(/2번째/g) ?? []).length === 1"));
   check('ranked card has no redundant support line', await evaluate("!document.getElementById('result').textContent.includes('서버 처리 기준 순위입니다.')"));
-  check('ranked submission immediately hides button and keeps result', await evaluate("document.getElementById('submit-button').hidden && document.getElementById('submit-button').disabled && document.getElementById('result').dataset.state === 'ranked' && document.getElementById('round-status').textContent === '등록이 완료되었습니다. 다음 정각에 다시 참여할 수 있습니다.'"));
+  check('browser B ranked hides button and status while keeping result', await evaluate("document.getElementById('submit-button').hidden && document.getElementById('submit-button').disabled && document.getElementById('result').dataset.state === 'ranked' && document.getElementById('round-status').hidden && document.getElementById('round-status').textContent === ''"));
+  check('browser B clears submitted draft', await evaluate("document.getElementById('message-input').value === '' && document.getElementById('remaining').textContent === '120자 남음'"));
+  socket = firstSocket;
+  check('browser A remains winner without a button or ten-second status', await evaluate("document.getElementById('result').dataset.state === 'winner' && document.getElementById('submit-button').hidden && document.getElementById('round-status').hidden"));
+  socket = secondSocket;
   const screenshot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await mkdir('tests/e2e/artifacts', { recursive: true });
   await writeFile('tests/e2e/artifacts/button-ranked-mobile.png', Buffer.from(screenshot.data, 'base64'));
@@ -182,14 +235,20 @@ try {
   check('pending request blocks duplicate click', pendingState.disabled && pendingState.calls === 1 && duplicateCalls === 1);
   await evaluate('window.__releasePost()');
   await until(async () => evaluate("document.getElementById('result').textContent.includes('3번째')"));
+  await until(async () => evaluate('!pending'));
 
   const timing = await evaluate(`(() => {
+    const input = document.getElementById('message-input');
+    const originalInput = input.value;
+    const originalOpen = round.currentSlot.registrationOpen;
     const originalTarget = targetSlotAt;
     const originalOffset = serverOffsetMs;
     const originalClose = registrationClosesAt;
     const originalSuccess = successfulSlotAt;
     const originalBoundary = observedBoundary;
     const button = document.getElementById('submit-button');
+    input.value = 'future-draft';
+    round.currentSlot.registrationOpen = true;
     observedBoundary = round.nextSlotAt;
     registrationClosesAt = null;
     successfulSlotAt = null;
@@ -207,9 +266,13 @@ try {
     registrationClosesAt = originalClose;
     successfulSlotAt = originalSuccess;
     observedBoundary = originalBoundary;
+    round.currentSlot.registrationOpen = originalOpen;
+    input.value = originalInput;
+    updateInputCount();
     tick();
     return { beforeStartDisabled, atStartEnabled, afterEndDisabled };
   })()`);
+  artifact.timing = timing;
   check('slot clock gates registration in browser', timing.beforeStartDisabled && timing.atStartEnabled && timing.afterEndDisabled);
   artifact.clockCheck = 'Browser clock offset simulated; actual hour boundary was not awaited';
 
@@ -283,18 +346,31 @@ try {
   check('new round accepts a fresh winner', freshResponse.status === 200
     && fresh.code === 'WINNER' && fresh.position === 1 && fresh.winner === true);
   artifact.previousRoundFixture = { requested: 1, succeeded: 1, winnerCount: 1, position: 1 };
-  const nextRoundUi = await evaluate(`(() => {
+  const simulateNextRound = `(() => {
     const start = Date.parse(round.nextSlotAt);
     const originalFetch = window.fetch;
     window.fetch = (...args) => args[0] === '/api/round' ? new Promise(() => {}) : originalFetch(...args);
     serverOffsetMs = start + 100 - Date.now();
     tick();
+    const button = document.getElementById('submit-button');
+    const blankDisabled = button.disabled;
+    document.getElementById('message-input').value = 'next-round-draft';
+    updateInputCount();
     return { enabled: !document.getElementById('submit-button').disabled,
-      visible: !document.getElementById('submit-button').hidden,
+      visible: !button.hidden, blankDisabled,
       closeCleared: registrationClosesAt === null, successCleared: successfulSlotAt === null,
+      statusVisible: !document.getElementById('round-status').hidden,
+      resultCleared: document.getElementById('result').textContent === '',
       newTarget: targetSlotAt === new Date(start).toISOString() };
-  })()`);
-  check('next round enables button immediately at corrected boundary', nextRoundUi.enabled && nextRoundUi.visible && nextRoundUi.closeCleared && nextRoundUi.successCleared && nextRoundUi.newTarget);
+  })()`;
+  const nextRoundUiB = await evaluate(simulateNextRound);
+  socket = firstSocket;
+  const nextRoundUiA = await evaluate(simulateNextRound);
+  socket = secondSocket;
+  for (const [browser, state] of [['A', nextRoundUiA], ['B', nextRoundUiB]]) {
+    check(`browser ${browser} enables button in next round`, state.enabled && state.visible && state.blankDisabled
+      && state.closeCleared && state.successCleared && state.statusVisible && state.resultCleared && state.newTarget);
+  }
   artifact.clockCheck = 'Actual ten-second window awaited; hour transition simulated in browser and prior-round DB fixture';
   console.log('Browser registration E2E passed');
 } catch (error) {
@@ -304,7 +380,9 @@ try {
 } finally {
   await mkdir('tests/e2e/artifacts', { recursive: true });
   await writeFile('tests/e2e/artifacts/button-browser-flow.json', JSON.stringify(artifact, null, 2) + '\n');
-  socket?.close();
+  secondSocket?.close();
+  firstSocket?.close();
+  browserSocket?.close();
   app?.kill();
   await pool?.end();
   await admin.end();

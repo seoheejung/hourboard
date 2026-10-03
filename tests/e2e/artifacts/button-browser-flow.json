@@ -1,6 +1,6 @@
 {
   "scenario": "current-round-browser-registration",
-  "browser": "Chrome headless via DevTools Protocol",
+  "browser": "Chrome headless with two browser contexts via DevTools Protocol",
   "requested": 4,
   "succeeded": 3,
   "failed": 1,
@@ -19,17 +19,21 @@
     "valid message enables button before winner": true,
     "first registration shows WINNER": true,
     "winner copy says until the next hour": true,
+    "browser A winner hides button and status while keeping result": true,
+    "browser A clears submitted draft while retaining winner board": true,
     "first registration opens ten-second window": true,
-    "browser displays open window countdown": true,
+    "browser B can register during the open window": true,
     "valid message enables button with winner": true,
     "subsequent registration shows RANKED position 2 once": true,
     "ranked card has no redundant support line": true,
+    "browser B ranked hides button and status while keeping result": true,
+    "browser B clears submitted draft": true,
+    "browser A remains winner without a button or ten-second status": true,
     "valid third message enables button": true,
     "pending request blocks duplicate click": true,
     "slot clock gates registration in browser": true,
-    "button disables after real ten-second window": true,
-    "button hides until five minutes before next hour": true,
-    "button remains disabled one second before next hour": true,
+    "own button stays hidden after real ten-second window": true,
+    "own button stays hidden before the next hour": true,
     "direct API attempt is rejected after close": true,
     "winner stays visible after registration closes": true,
     "mobile title is one line with new spacing": true,
@@ -37,17 +41,23 @@
     "database winner and positions remain consistent": true,
     "new round with only previous winner is open": true,
     "new round accepts a fresh winner": true,
-    "next round enables button immediately at corrected boundary": true
+    "browser A enables button in next round": true,
+    "browser B enables button in next round": true
   },
-  "slotAt": "2026-09-26T16:00:00.000Z",
-  "registrationClosesAt": "2026-09-26T16:16:47.676Z",
+  "slotAt": "2026-10-03T11:00:00.000Z",
+  "registrationClosesAt": "2026-10-03T11:03:03.891Z",
+  "timing": {
+    "beforeStartDisabled": true,
+    "atStartEnabled": true,
+    "afterEndDisabled": true
+  },
   "clockCheck": "Actual ten-second window awaited; hour transition simulated in browser and prior-round DB fixture",
   "mobile": {
     "text": "한 시간 동안 띄워드립니다",
     "lineHeight": 25.056,
     "height": 25.046875,
     "horizontalOverflow": false,
-    "buttonBottom": 642.359375
+    "buttonBottom": 673.359375
   },
   "previousRoundFixture": {
     "requested": 1,

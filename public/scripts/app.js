@@ -208,6 +208,7 @@ async function syncOpenState() {
 }
 function tick() {
     if (!round) {
+        roundStatus.hidden = false;
         roundStatus.textContent = roundError ? '서버 연결을 확인해 주세요.' : '서버 시각을 확인하는 중입니다.';
         submitButton.hidden = true;
         submitButton.disabled = true;
@@ -219,6 +220,7 @@ function tick() {
         || (registrationClosesAt !== null && now >= Date.parse(registrationClosesAt));
     const submittedThisRound = successfulSlotAt === round.currentSlot.startsAt;
     submitButton.hidden = submittedThisRound || (registrationClosed && remainingMs > BUTTON_PREVIEW_MS);
+    roundStatus.hidden = submittedThisRound;
     if (submitButton.hidden && !submittedThisRound && !pending && clearedClosedSlotAt !== round.currentSlot.startsAt) {
         clearedClosedSlotAt = round.currentSlot.startsAt;
         input.value = '';
@@ -234,7 +236,7 @@ function tick() {
     if (pending)
         roundStatus.textContent = '등록 결과를 기다리는 중입니다.';
     else if (submittedThisRound)
-        roundStatus.textContent = '등록이 완료되었습니다. 다음 정각에 다시 참여할 수 있습니다.';
+        roundStatus.textContent = '';
     else if (roundError)
         roundStatus.textContent = '전광판 갱신이 지연되고 있습니다.';
     else if (openStateError && !registrationClosesAt)
@@ -299,12 +301,20 @@ form.addEventListener('submit', async (event) => {
             localWinner = { slotAt, message };
             if (round?.currentSlot.startsAt === slotAt)
                 showBoardMessage(message);
+            if (input.value.trim() === message) {
+                input.value = '';
+                updateInputCount();
+            }
         }
         else if (response.ok && data.slotAt === slotAt && data.code === 'RANKED' && Number.isInteger(data.position) && data.position >= 2 && data.winner === false) {
             successfulSlotAt = slotAt;
             if (round?.currentSlot.startsAt === slotAt && data.registrationClosesAt)
                 registrationClosesAt = data.registrationClosesAt;
             showResult('ranked', '아쉽군요!', data.message);
+            if (input.value.trim() === message) {
+                input.value = '';
+                updateInputCount();
+            }
             void syncRound();
         }
         else if (!response.ok && data.code === 'INVALID_REQUEST') {

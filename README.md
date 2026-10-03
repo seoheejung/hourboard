@@ -95,6 +95,7 @@ HourBoard는 매시 정각 하나의 시간 슬롯을 열고, 해당 슬롯에 �
 - 등록 요청은 대상 Slot이 실제로 시작된 뒤에만 처리한다.
 - 서버의 Registration Window는 첫 정상 등록 이후 10초 미만 동안 유지되며 마감 시각은 다음 정각을 넘지 않는다.
 - `WINNER` 또는 `RANKED` 응답을 받은 현재 페이지 세션은 해당 Round에서 등록 버튼을 즉시 숨기고 추가 UI 제출을 막는다.
+- 등록에 성공하면 제출한 문구를 입력창에서 비운다. 전광판과 결과 카드는 유지하며, 다음 Round용 문구는 다시 입력할 수 있다.
 - 정상 등록 응답을 받은 현재 페이지에는 Registration Window countdown을 표시하지 않고 결과 카드는 유지한다.
 - 아직 등록하지 않은 다른 브라우저는 서버 Registration Window가 열려 있는 동안 기존 규칙대로 등록할 수 있다.
 - Registration Window가 끝난 뒤 미등록 사용자에게는 등록 마감 상태를 표시한다.
@@ -265,7 +266,7 @@ OCI Japan East (Tokyo) A1 Flex를 무료 배포 후보로 검증했으나 Comput
 
 ## Beta UI · Web 품질 보강
 
-작업 PC 기준으로 아래 기본 Beta UI/Web 품질 변경은 commit `6455d7b`에 반영했다. 이후 등록 성공 후 UI 후속 수정은 `src/client/app.ts`, `public/scripts/app.js`, `tests/e2e/run-button-browser-e2e.mjs` 3개 파일에 미커밋 상태로 남아 있다. 최신 변경을 포함한 Production 재배포와 실제 브라우저 검증은 아직 수행하지 않았다.
+작업 PC 기준으로 아래 기본 Beta UI/Web 품질 변경은 commit `6455d7b`에 반영했다. 이후 등록 완료 UI와 보안 헤더를 로컬에서 구현·검증했다. 최신 변경의 Production 재배포와 운영 브라우저 검증은 아직 수행하지 않았다. [로컬 검증 결과](docs/results/phase4-local-ui-security-followup.md)에 확인 범위를 기록했다.
 
 - 모바일 제목 줄바꿈과 overflow 보정
 - 입력 오류 안내 개선
@@ -276,15 +277,17 @@ OCI Japan East (Tokyo) A1 Flex를 무료 배포 후보로 검증했으나 Comput
 - `public/sitemap.xml` 추가
 - `/api` 미정의 경로에 JSON 404 응답 추가
 - Production Traefik에서 `POST /api/attempts`에만 rate limit middleware 적용
+- 등록 성공 후 버튼·마감 안내를 숨기고 제출한 입력 문구를 비움. 결과 카드와 Winner 전광판은 유지
+- 응답에 CSP, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` 추가
 - 전광판·버튼·disabled 상태의 색상 대비 계산값 4.79:1 이상 확인
 - 프런트엔드 정적 파일에서 운영 secret 관련 문자열 미검출 확인
 
-로컬에서 `npm run build`, Production Compose 설정 검사, 정적 파일·404 HTTP 확인을 통과했다.
+로컬에서 `npm run build`, 실제 PostgreSQL Phase 1·2 E2E, 실제 Chrome 두 브라우저 컨텍스트 등록 E2E, 보안 헤더·본문 제한·JSON 404 HTTP 확인을 통과했다. Production Compose 설정 검사는 앞선 Beta 작업에서 통과했다.
 
 아직 확인하지 않은 항목:
 
-- 실제 브라우저 E2E
 - Production에서 등록 성공 후 버튼 즉시 숨김·다음 Round 초기화
+- Production에서 등록 후 입력 문구 비움과 보안 헤더
 - Production rate limit 실제 동작
 - Production 페이지 로드 속도
 - 외부 E2E와 latency
@@ -457,6 +460,7 @@ Registration Window 종료 후 `REGISTRATION_CLOSED`로 거부된 요청은 Posi
 - `WINNER` / `RANKED` 성공 응답을 받은 현재 페이지의 등록 버튼 즉시 숨김·비활성화
 - 정상 등록 응답을 받은 현재 페이지에 10초 마감 countdown 미표시
 - 등록 성공 결과 카드 유지
+- 등록 성공 후 입력창의 제출 문구 비움
 - 현재 페이지에서 다음 Round 감지 시 참여 완료 상태 초기화
 - 보정된 서버 시각 기준 새 Round 전환
 
@@ -532,11 +536,12 @@ Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, �
 - title / Open Graph / og-image / robots.txt / sitemap.xml
 - `/api` JSON 404
 - `POST /api/attempts` Traefik rate limit
-- 등록 성공 응답을 받은 현재 페이지의 버튼 즉시 숨김·10초 안내 미표시·다음 Round 감지 시 초기화
+- 등록 성공 응답을 받은 현재 페이지의 버튼 즉시 숨김·10초 안내 미표시·입력 문구 비움·다음 Round 감지 시 초기화
+- CSP·`nosniff`·`no-referrer` 응답 헤더
 
 남은 검증:
 
-- 미커밋 UI 후속 수정 3개 파일의 검증 후 commit·push 및 최신 변경의 Production 재배포
+- 최신 변경의 Production 재배포
 - 실제 브라우저에서 Winner / Ranked 성공 후 버튼 상태와 다음 Round 초기화
 - 다른 브라우저의 10초 Registration Window 유지 확인
 - Production rate limit 실제 동작
@@ -544,6 +549,8 @@ Phase 3 로컬 baseline을 유지한 상태에서 실제 외부 배포, HTTPS, �
 - 외부 E2E
 - 외부 RTT 및 p50 / p95 / p99
 - Docker socket 직접 mount 보안 보강 여부 결정
+
+작업 PC 검증 결과: [로컬 등록 완료 UI·보안 점검](docs/results/phase4-local-ui-security-followup.md)
 
 세부 지침: [Phase 4B 자체 호스팅 배포](docs/instructions/phase4-self-hosted-deployment.md)
 
